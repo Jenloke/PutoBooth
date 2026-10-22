@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Photobooth</title>
+    <meta
+      name="description"
+      content="A photobooth in your browser. Shoot a timed photo strip and save it. Photos never leave your device."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Photobooth" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Sets the theme class before first paint (no wrong-theme flash). Its sha256 is pinned in vercel.json's CSP; tests/csp.test.ts keeps them in sync. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("photobooth-theme")
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches)
+          var root = document.documentElement
+          root.classList.add(dark ? "dark" : "light")
+          root.style.colorScheme = dark ? "dark" : "light"
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", dark ? "#0a0a0a" : "#ffffff")
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
