@@ -13,6 +13,14 @@ function inlineScriptHashes(html: string): string[] {
   )
 }
 
+/** The shared booth's signaling host, as configured in the app. */
+function signalingHost(): string {
+  const source = readFileSync(resolve(root, "src/features/pair/config.ts"), "utf8")
+  const host = /DEFAULT_SIGNALING_HOST = "([^"]+)"/.exec(source)?.[1]
+  if (!host) throw new Error("DEFAULT_SIGNALING_HOST not found in src/features/pair/config.ts")
+  return host
+}
+
 function cspFromVercelJson(): string {
   const config = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8")) as {
     headers: { source: string; headers: { key: string; value: string }[] }[]
@@ -41,6 +49,11 @@ describe("Content-Security-Policy", () => {
       for (const hash of hashes) expect(scriptSrc).toContain(hash)
     }
   )
+
+  it("lets the shared booth reach its signaling server, and nothing else", () => {
+    const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src")) ?? ""
+    expect(connectSrc.trim().split(/\s+/).slice(1).sort()).toEqual(["'self'", `wss://${signalingHost()}`])
+  })
 
   it("keeps the camera and object URLs working", () => {
     expect(csp).toMatch(/img-src[^;]*blob:/)

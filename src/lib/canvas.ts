@@ -90,3 +90,26 @@ export function roundRectPath(
   ctx.arcTo(x, y, x + w, y, r)
   ctx.closePath()
 }
+
+/**
+ * Re-encodes a photo as a JPEG whose shorter side is at most `maxShortEdge` (never upscaled).
+ * A JPEG that is already small enough is returned as is.
+ */
+export async function shrinkToJpeg(
+  photo: { blob: Blob; width: number; height: number },
+  maxShortEdge: number,
+  quality: number
+): Promise<{ blob: Blob; width: number; height: number }> {
+  const scale = Math.min(1, maxShortEdge / Math.min(photo.width, photo.height))
+  if (scale === 1 && photo.blob.type === "image/jpeg") return photo
+  const image = await decodeImage(photo.blob)
+  const canvas = createCanvas(image.width * scale, image.height * scale)
+  try {
+    context2d(canvas).drawImage(image.source, 0, 0, canvas.width, canvas.height)
+    const blob = await canvasToBlob(canvas, "image/jpeg", quality)
+    return { blob, width: canvas.width, height: canvas.height }
+  } finally {
+    image.close()
+    freeCanvas(canvas)
+  }
+}
