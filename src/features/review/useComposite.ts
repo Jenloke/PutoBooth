@@ -93,12 +93,12 @@ async function makeThumb(canvas: HTMLCanvasElement): Promise<Blob> {
 async function compose(params: CompositeParams, key: string, cache: DecodeCache): Promise<CompositeResult> {
   const { layout, shots, design, takenAt, logo, format, quality } = params
   const sheet = params.printSheet && isStrip(layout)
-  const images = await Promise.all(shots.map((shot) => (shot ? cache.shot(shot) : null)))
+  const slots = await Promise.all(shots.map(async (shot) => [shot ? await cache.shot(shot) : null]))
   const logoImage = logo && design.showLogo ? await cache.logo(logo) : null
 
   let canvas = await renderComposite({
     layout,
-    images,
+    slots,
     design,
     date: new Date(takenAt),
     logo: logoImage,

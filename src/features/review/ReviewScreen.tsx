@@ -14,11 +14,10 @@ import { Kbd } from "@/components/ui/kbd"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "@/features/booth/session"
 import { useLogo } from "@/features/compose/logoStore"
-import { compositeGeometry } from "@/features/compose/renderComposite"
 import { downloadFile } from "@/features/export/export"
 import { PrintImage, printNow } from "@/features/export/print"
 import { shareFile } from "@/features/export/share"
-import { computePrintSheet } from "@/features/layouts/computeLayout"
+import { compositeGeometry, computePrintSheet } from "@/features/layouts/computeLayout"
 import {
   PRINT_DPI,
   PRINT_SHEET,
