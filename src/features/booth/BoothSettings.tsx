@@ -42,6 +42,8 @@ type BoothSettingsProps = {
   /** The phone UI has layout chips under the preview, so only panels show the list. */
   showLayouts: boolean
   disabled: boolean
+  /** Shared booth guest: the host's countdown and pause apply, so these show who sets them. */
+  timingFrom?: string
 }
 
 type BooleanSetting = "mirror" | "flash" | "sound" | "grid"
@@ -61,6 +63,7 @@ export function BoothSettings({
   onSelectLayout,
   showLayouts,
   disabled,
+  timingFrom,
 }: BoothSettingsProps) {
   const settings = useSettings()
   const id = useId()
@@ -102,7 +105,7 @@ export function BoothSettings({
           spacing={0}
           value={String(settings.countdown)}
           onValueChange={(v) => v && settings.update({ countdown: Number(v) as Countdown })}
-          disabled={disabled}
+          disabled={disabled || timingFrom !== undefined}
           aria-label="Countdown"
           className="w-full"
         >
@@ -126,9 +129,12 @@ export function BoothSettings({
             step={PAUSE_RANGE.step}
             value={[settings.pauseSeconds]}
             onValueChange={([value]) => settings.update({ pauseSeconds: value })}
-            disabled={disabled}
+            disabled={disabled || timingFrom !== undefined}
             aria-label="Pause between shots, in seconds"
           />
+          {timingFrom !== undefined && (
+            <FieldDescription>In the shared booth, {timingFrom}'s countdown and pause are used.</FieldDescription>
+          )}
         </Field>
       </FieldSet>
 

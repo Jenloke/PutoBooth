@@ -63,6 +63,11 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             groups: [
               { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+              // The shared booth's libraries load only when someone opens it.
+              {
+                name: "pair",
+                test: /node_modules[\\/](peerjs|peerjs-js-binarypack|webrtc-adapter|sdp|eventemitter3|@msgpack|uqr)[\\/]/,
+              },
               { name: "ui", test: /node_modules[\\/]/ },
             ],
           },

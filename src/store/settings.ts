@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware"
 
 import { DEFAULT_DESIGN, sanitizeDesign, type Design } from "@/features/compose/design"
 import { DEFAULT_LAYOUT_ID, isLayoutId, type LayoutId } from "@/features/layouts/layouts"
+import { cleanName } from "@/features/pair/protocol"
 
 export type Countdown = 3 | 5 | 10
 export type ExportFormat = "png" | "jpeg"
@@ -31,6 +32,8 @@ export interface Settings {
   design: Design
   facing: Facing
   cameraId: string | null
+  /** Shown to a shared booth partner; empty means the device's name. */
+  displayName: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   design: DEFAULT_DESIGN,
   facing: "user",
   cameraId: null,
+  displayName: "",
 }
 
 interface SettingsActions {
@@ -77,6 +81,7 @@ export function sanitizeSettings(value: Partial<Settings> | undefined): Settings
     design: sanitizeDesign(s.design),
     facing: s.facing === "environment" ? "environment" : "user",
     cameraId: typeof s.cameraId === "string" && s.cameraId ? s.cameraId : null,
+    displayName: cleanName(s.displayName),
   }
 }
 

@@ -9,6 +9,18 @@ export function isIOS(): boolean {
   )
 }
 
+/** A friendly default name for this device ("iPhone", "Mac", …), shown to a shared booth partner. */
+export function deviceName(): string {
+  const ua = navigator.userAgent
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad"
+  if (/iPhone|iPod/.test(ua)) return "iPhone"
+  if (/Android/.test(ua)) return /Mobile/.test(ua) ? "Android phone" : "Android tablet"
+  if (/Macintosh/.test(ua)) return "Mac"
+  if (/Windows/.test(ua)) return "Windows PC"
+  if (/CrOS/.test(ua)) return "Chromebook"
+  return "Guest"
+}
+
 export function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||

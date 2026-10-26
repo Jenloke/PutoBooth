@@ -1,4 +1,4 @@
-import { PRINT_DPI, type LayoutSpec } from "./layouts"
+import { PRINT_DPI, withPadding, type LayoutSpec } from "./layouts"
 
 export interface Rect {
   x: number
@@ -106,4 +106,41 @@ export function computePrintSheet(
     h: strip.height,
   }))
   return { width, height, placements }
+}
+
+/** Geometry the compositor uses for a design: the layout with the design's padding applied. */
+export function compositeGeometry(layout: LayoutSpec, design: { padding: number }): ComputedLayout {
+  return computeLayout(withPadding(layout, design.padding), PRINT_DPI)
+}
+
+/** Seam between the photos sharing a slot, as a fraction of the slot's shorter side. */
+export const SPLIT_GAP_FRACTION = 0.025
+
+/**
+ * The photo rects inside one slot: the slot itself, or (shared booth) `parts` equal photos
+ * along its longer side, side by side in landscape and square slots and stacked in portrait
+ * ones. The seam scales with the design's padding, so padding 0 makes the photos touch.
+ * Integer rects that tile the slot exactly; an odd pixel goes to the last photo.
+ */
+export function slotParts(slot: Rect, parts: number, padding = 1): Rect[] {
+  if (parts <= 1) return [slot]
+  const horizontal = slot.w >= slot.h
+  const length = horizontal ? slot.w : slot.h
+  const wanted = Math.round(Math.min(slot.w, slot.h) * SPLIT_GAP_FRACTION * Math.max(0, padding))
+  const gap = Math.min(wanted, Math.floor((length - parts) / (parts - 1)))
+  const available = length - gap * (parts - 1)
+  const size = Math.floor(available / parts)
+
+  const rects: Rect[] = []
+  let offset = 0
+  for (let i = 0; i < parts; i++) {
+    const extent = i === parts - 1 ? available - size * (parts - 1) : size
+    rects.push(
+      horizontal
+        ? { x: slot.x + offset, y: slot.y, w: extent, h: slot.h }
+        : { x: slot.x, y: slot.y + offset, w: slot.w, h: extent }
+    )
+    offset += extent + gap
+  }
+  return rects
 }

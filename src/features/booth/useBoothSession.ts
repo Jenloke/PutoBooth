@@ -7,19 +7,24 @@ import { useSettings } from "@/store/settings"
 
 import { isShooting, useSession } from "./session"
 import { playShutter, playTick } from "./sound"
+import { buildTimeline, type Timeline } from "./timeline"
 
-/** How long the white flash shows before the frame is grabbed, so it actually lights faces. */
-const FLASH_LEAD_MS = 220
-/** Lets the last thumbnail land in the tray before switching to review. */
-const FINAL_PAUSE_MS = 700
+/** The sequence in progress. One booth runs at a time, so this lives at module level. */
+let activeRun: AbortController | null = null
 
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
+/** Stops the running sequence's timers. Resetting the session is the caller's job. */
+export function abortRun(): void {
+  activeRun?.abort()
+  activeRun = null
+}
+
+function sleepUntil(time: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(signal.reason)
       return
     }
-    const timer = window.setTimeout(resolve, ms)
+    const timer = window.setTimeout(resolve, Math.max(0, time - performance.now()))
     signal.addEventListener(
       "abort",
       () => {
@@ -31,91 +36,112 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-/** Resolves after the browser has painted the current state (e.g. the flash). */
-function afterPaint(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-}
-
-async function runSequence(
-  indices: number[],
+async function runTimeline(
+  timeline: Timeline,
   videoRef: RefObject<HTMLVideoElement | null>,
   mirror: boolean,
   signal: AbortSignal
 ) {
   const session = useSession.getState
-  const { countdown, pauseSeconds, flash, sound } = useSettings.getState()
+  const { sound } = useSettings.getState()
 
-  for (let i = 0; i < indices.length; i++) {
-    const index = indices[i]
-    for (let n: number = countdown; n >= 1; n--) {
-      session().setPhase("countdown", { activeIndex: index, count: n })
-      if (sound) playTick(n === 1)
-      await sleep(1000, signal)
+  for (const step of timeline.steps) {
+    for (let k = 0; k < step.ticks.length; k++) {
+      // Running late (a slow capture, or a start that arrived late): skip numbers already over.
+      if (performance.now() >= (step.ticks[k + 1] ?? step.shutterAt)) continue
+      await sleepUntil(step.ticks[k], signal)
+      const count = step.ticks.length - k
+      session().setPhase("countdown", { activeIndex: step.index, count })
+      if (sound) playTick(count === 1)
     }
 
-    session().setPhase("capturing", { activeIndex: index, count: 0 })
-    await afterPaint()
-    if (flash) await sleep(FLASH_LEAD_MS, signal)
+    await sleepUntil(step.shutterAt, signal)
+    session().setPhase("capturing", { activeIndex: step.index, count: 0 })
+    // The flash shows first so it actually lights faces.
+    await sleepUntil(step.captureAt, signal)
 
     const video = videoRef.current
     if (!video) throw new Error("The camera preview went away")
     const frame = await captureFrame(video, { mirror })
     if (signal.aborted) return
     if (sound) playShutter()
-    session().setShot(index, {
+    session().setShot(step.index, {
       id: uid(),
       blob: frame.blob,
       url: URL.createObjectURL(frame.blob),
       width: frame.width,
       height: frame.height,
     })
-
-    session().setPhase("pause", { activeIndex: index })
-    const last = i === indices.length - 1
-    await sleep(last ? FINAL_PAUSE_MS : pauseSeconds * 1000, signal)
+    session().setPhase("pause", { activeIndex: step.index })
   }
+
+  await sleepUntil(timeline.endAt, signal)
   session().finish()
 }
 
+type BoothSessionOptions = {
+  /** Called when a sequence ends early: an error, or the booth closing mid-sequence. */
+  onAbort?: () => void
+}
+
 /**
- * Runs the capture sequence: countdown → flash + capture → pause, for each slot (or only the
- * slot being retaken), then review. State lives in the session store; this owns the timers.
+ * Runs capture sequences: countdown → flash + capture → pause, for each slot (or only the
+ * slot being retaken), then review. `start` shoots now on this device; `run` plays a timeline
+ * agreed with a shared booth partner. State lives in the session store; this owns the timers.
  */
-export function useBoothSession(videoRef: RefObject<HTMLVideoElement | null>) {
-  const abortRef = useRef<AbortController | null>(null)
+export function useBoothSession(videoRef: RefObject<HTMLVideoElement | null>, options: BoothSessionOptions = {}) {
+  const onAbort = useRef(options.onAbort)
+  useEffect(() => {
+    onAbort.current = options.onAbort
+  })
 
-  const start = useCallback(
-    ({ mirror }: { mirror: boolean }) => {
-      const { phase, retakeIndex, shots } = useSession.getState()
-      if (isShooting(phase)) return
-      abortRef.current?.abort()
+  const run = useCallback(
+    (timeline: Timeline, { mirror }: { mirror: boolean }) => {
+      abortRun()
       const controller = new AbortController()
-      abortRef.current = controller
-      const indices = retakeIndex !== null ? [retakeIndex] : shots.map((_, i) => i)
+      activeRun = controller
 
-      runSequence(indices, videoRef, mirror, controller.signal)
+      runTimeline(timeline, videoRef, mirror, controller.signal)
         .catch((error: unknown) => {
           if (controller.signal.aborted) return
           useSession.getState().cancel()
+          onAbort.current?.()
           toast.error("Couldn't take the photo", {
             description: error instanceof Error ? error.message : undefined,
           })
         })
         .finally(() => {
-          if (abortRef.current === controller) abortRef.current = null
+          if (activeRun === controller) activeRun = null
         })
     },
     [videoRef]
   )
 
+  const start = useCallback(
+    ({ mirror }: { mirror: boolean }) => {
+      const { phase, retakeIndex, shots } = useSession.getState()
+      if (isShooting(phase) || activeRun) return
+      const { countdown, pauseSeconds } = useSettings.getState()
+      const indices = retakeIndex !== null ? [retakeIndex] : shots.map((_, i) => i)
+      run(buildTimeline({ startAt: performance.now(), indices, countdown, pauseMs: pauseSeconds * 1000 }), { mirror })
+    },
+    [run]
+  )
+
   const cancel = useCallback(() => {
-    abortRef.current?.abort()
-    abortRef.current = null
+    abortRun()
     if (isShooting(useSession.getState().phase)) useSession.getState().cancel()
   }, [])
 
   // Leaving the booth mid-sequence (e.g. browser back) cancels it.
-  useEffect(() => cancel, [cancel])
+  useEffect(
+    () => () => {
+      const shooting = isShooting(useSession.getState().phase)
+      cancel()
+      if (shooting) onAbort.current?.()
+    },
+    [cancel]
+  )
 
-  return { start, cancel }
+  return { start, run, cancel }
 }

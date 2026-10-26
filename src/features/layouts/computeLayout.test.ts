@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { computeLayout, computePrintSheet, type Rect } from "./computeLayout"
+import { computeLayout, computePrintSheet, slotParts, type Rect } from "./computeLayout"
 import {
   LAYOUTS,
   PRINT_SHEET,
@@ -172,5 +172,46 @@ describe("layout catalog", () => {
   it("groups layouts that can share shots", () => {
     expect(layoutsWithShotCount(4).map((l) => l.id)).toEqual(["classic", "grid", "square"])
     expect(layoutsWithShotCount(1).map((l) => l.id)).toEqual(["postcard", "instant"])
+  })
+})
+
+describe("shared slots", () => {
+  const area = (r: Rect) => r.w * r.h
+
+  it("keeps a single photo as the whole slot", () => {
+    expect(slotParts(rect(30, 30, 540, 360), 1)).toEqual([rect(30, 30, 540, 360)])
+  })
+
+  it("puts two photos side by side in landscape slots, as 3:4 portraits for a classic strip", () => {
+    // 2.5% of the 360 px side is a 9 px seam.
+    expect(slotParts(rect(30, 30, 540, 360), 2)).toEqual([rect(30, 30, 265, 360), rect(304, 30, 266, 360)])
+  })
+
+  it("stacks two photos in portrait slots", () => {
+    const [top, bottom] = slotParts(rect(40, 40, 540, 720), 2)
+    expect(top).toEqual(rect(40, 40, 540, 353))
+    expect(bottom.y).toBe(top.y + top.h + 14)
+    expect(bottom.y + bottom.h).toBe(40 + 720)
+  })
+
+  it("splits square slots side by side", () => {
+    const [left, right] = slotParts(rect(0, 0, 500, 500), 2)
+    expect(left.h).toBe(500)
+    expect(right.x + right.w).toBe(500)
+  })
+
+  it("tiles the slot exactly for every layout, and scales the seam with padding", () => {
+    for (const layout of LAYOUTS) {
+      for (const slot of computeLayout(layout).slots) {
+        for (const padding of [0, 1, 2]) {
+          const parts = slotParts(slot, 2, padding)
+          const horizontal = slot.w >= slot.h
+          const seam = horizontal ? parts[1].x - (parts[0].x + parts[0].w) : parts[1].y - (parts[0].y + parts[0].h)
+          expect(area(parts[0]) + area(parts[1]) + seam * (horizontal ? slot.h : slot.w)).toBe(area(slot))
+          expect(Math.abs(area(parts[0]) - area(parts[1]))).toBeLessThanOrEqual(Math.max(slot.w, slot.h))
+          if (padding === 0) expect(seam).toBe(0)
+        }
+      }
+    }
   })
 })

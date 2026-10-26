@@ -12,6 +12,8 @@ type CountdownProps = {
 function announcement({ phase, count, index, total, retaking }: CountdownProps): string {
   const photo = index === null ? "" : retaking ? `Retaking photo ${index + 1}. ` : `Photo ${index + 1} of ${total}. `
   switch (phase) {
+    case "starting":
+      return "Get ready."
     case "countdown":
       return `${photo}${count}`
     case "capturing":
@@ -28,6 +30,13 @@ export function Countdown(props: CountdownProps) {
   const { phase, count, index, total } = props
   return (
     <>
+      {phase === "starting" && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="rounded-full bg-black/55 px-4 py-1.5 text-base font-medium text-white backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in-0">
+            Get ready…
+          </span>
+        </div>
+      )}
       {phase === "countdown" && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 grid place-items-center">
           <span

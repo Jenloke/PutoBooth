@@ -4,6 +4,7 @@ import { CameraIcon, ImagesIcon } from "lucide-react"
 import { BrandMark } from "@/components/brand-mark"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
+import { PairButton } from "@/features/pair/PairButton"
 import { navigate, useRoute } from "@/lib/router"
 import { cn } from "@/lib/utils"
 
@@ -38,6 +39,7 @@ export function AppHeader({ actions, locked = false, className }: AppHeaderProps
           <BrandMark />
           <span>Photobooth</span>
         </a>
+        <PairButton disabled={locked} />
         {actions}
         <nav aria-label="Main" className="flex items-center gap-1">
           <Button

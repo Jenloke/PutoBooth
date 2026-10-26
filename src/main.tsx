@@ -7,9 +7,11 @@ import { PwaUpdatePrompt } from "@/components/pwa-update"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { consumeJoinLink } from "@/features/pair/pairStore"
 import { normalizeLocation } from "@/lib/router"
 
 normalizeLocation()
+consumeJoinLink()
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

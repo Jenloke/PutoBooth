@@ -4,13 +4,18 @@ A photobooth that runs entirely in the browser. Tap the shutter, get a countdown
 sequence of photos, and leave with a print-ready image: a classic 2×6 in strip by default,
 or one of six other layouts. Built for Safari on iPhone and Safari/Chrome on Mac.
 
+Two people can also **shoot together on two devices**: each fills one half of every photo,
+the countdown runs on both screens at once, and both get the strip (see
+[Shared booth](#shared-booth)).
+
 Everything happens on the device. There is no backend, nothing is uploaded, and the site
-deploys to Vercel as static files.
+deploys to Vercel as static files. In a shared booth, photos go straight to the other device.
 
 - **Stack:** Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), lucide-react,
-  zustand, idb-keyval, vite-plugin-pwa, self-hosted fonts via @fontsource.
-- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP hash) and Playwright
-  (full sessions with Chromium's fake camera).
+  zustand, idb-keyval, vite-plugin-pwa, PeerJS (WebRTC), uqr, self-hosted fonts via @fontsource.
+- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP, and the shared booth's
+  protocol, framing, clock sync and timeline) and Playwright (full sessions with Chromium's fake
+  camera, including two browsers sharing a booth).
 
 ## Quick start
 
@@ -34,8 +39,9 @@ Node 22 is required (`engines.node` is `22.x`, which Vercel also uses).
 
 ## Deploying to Vercel
 
-The repo is a plain static Vite site: no server functions, environment variables or
-analytics. `vercel.json` holds the rewrite, cache and security headers.
+The repo is a plain static Vite site: no server functions or analytics, and no environment
+variables are needed (the shared booth has optional ones, see below). `vercel.json` holds the
+rewrite, cache and security headers.
 
 ### One-time setup (Git integration)
 
@@ -80,6 +86,8 @@ npx vercel --prod   # production deployment
     app itself; everything else is disabled.
   - The CSP allows `blob:` and `data:` images, which the shots and previews use. It does not
     allow `unsafe-inline` for scripts.
+  - `connect-src` allows only the app itself and `wss://0.peerjs.com`, the shared booth's
+    signaling server. `tests/csp.test.ts` checks it matches `src/features/pair/config.ts`.
   - The one inline script, the no-flash theme snippet in `index.html`, is allowed by its sha256
     hash. If you edit that script, update the hash in `vercel.json`. `tests/csp.test.ts` fails
     until they match, and prints the hash it expects.
@@ -90,6 +98,71 @@ The service worker precaches the whole app, so it works offline after the first 
 a new deploy is live, the app shows a **"New version available · Reload"** toast. It checks on
 launch, hourly, and whenever the app returns to the foreground. The toast never appears while
 photos are being taken, and nothing reloads by itself.
+
+## Shared booth
+
+Tap the people icon in the header to **Shoot together**.
+
+1. One person taps **Start a shared booth**. The app shows a 6-character code (like `K7M-4QD`),
+   a QR code and an invite link (`/?join=K7M4QD`).
+2. The other person scans the QR code, opens the link, or taps **Shoot together** and types
+   the code. Either device can be a phone or a computer, on any network.
+3. The booth preview splits in two: your camera live in your half, the other person's live
+   video in theirs. The host is on the left (or top, in tall layouts), the guest on the right.
+4. Either person presses the shutter. The countdown, flash and capture happen on both devices
+   at the same moment, and each sends its photos to the other.
+5. Each person customizes and saves their own copy. Tapping a photo to retake it, or **Retake
+   all**, reshoots on both devices together. Leaving keeps everything you already have; a
+   shared result in the gallery can still be edited later, and a retake then reshoots only your
+   half.
+
+### How it works
+
+- **Peer to peer.** The devices connect over WebRTC with [PeerJS](https://peerjs.com). Photos
+  and live video go directly between them, encrypted by WebRTC (DTLS/SRTP). Nothing is stored
+  on a server.
+- **Signaling.** To find each other, the devices exchange a few small messages through the free
+  PeerJS cloud server (`0.peerjs.com`). The host registers its room code there; a room exists
+  only while the host has the app open.
+- **Hard networks.** Phones on cellular networks often can't connect directly. PeerJS's
+  defaults include Google's STUN server and the PeerJS TURN relays, which then forward the
+  (still encrypted) traffic.
+- **Same moment on both screens.** The devices measure the offset between their clocks with
+  ping/pong round trips, NTP-style. The host schedules each sequence on its clock, and both
+  devices run the same absolute timeline. Captures typically land within a few tens of
+  milliseconds of each other (the clock estimate is only as good as the network is symmetric).
+- **The host decides.** The guest sends requests (shoot, retake, layout); the host checks that
+  both devices are ready (in the booth, camera live, same retake) and sends the commands both
+  apply.
+- **Photos.** Each device keeps its own full-resolution frames and sends the other a ~2 MP JPEG
+  (shorter side 1080 px), plenty for half a slot. Photos travel in 16 KiB chunks over a
+  reliable, ordered data channel. After a reconnect, each side resends what the other is
+  missing.
+- **Dropped connections.** A heartbeat notices a dead link within 10 seconds. The guest keeps
+  reconnecting for 2 minutes and the host keeps the room open; a sequence in progress is
+  cancelled on both devices.
+- **Bundle size.** PeerJS and the QR encoder load only when someone opens the shared booth.
+
+### Running your own signaling or TURN server (optional)
+
+The PeerJS cloud server is free and has no uptime guarantee. To use your own
+[PeerServer](https://github.com/peers/peerjs-server) or TURN server, set these in Vercel
+(**Project Settings → Environment Variables**) and redeploy:
+
+| Variable | Example | Meaning |
+| --- | --- | --- |
+| `VITE_PEER_HOST` | `peer.example.com` | PeerServer host (default: the PeerJS cloud server) |
+| `VITE_PEER_PORT` | `443` | Its port |
+| `VITE_PEER_PATH` | `/` | Its path |
+| `VITE_PEER_SECURE` | `true` | `false` only for a local `ws://` server |
+| `VITE_ICE_SERVERS` | `[{"urls":"turn:turn.example.com:3478","username":"u","credential":"p"}]` | STUN/TURN servers (JSON) |
+
+If you change the signaling host, also replace `wss://0.peerjs.com` in `connect-src` in
+`vercel.json` (and `DEFAULT_SIGNALING_HOST` in `src/features/pair/config.ts`, which the CSP test
+compares against).
+
+The end-to-end tests start a local PeerServer (`npx peerjs --port 9000`) and point the build
+at it, so they never touch the cloud server.
 
 ## Testing on an iPhone
 
@@ -126,13 +199,17 @@ src/
   features/
     camera/              useCamera (stream lifecycle, devices, errors), preview, picker, capture
     booth/               session store + runner (idle → countdown → capture → pause → review),
-                         countdown, flash, shot tray, shutter, settings panel, sounds
+                         timeline (absolute-time schedule), countdown, flash, shot tray, shutter,
+                         settings panel, sounds
     layouts/             layouts.ts (data), computeLayout.ts (pure geometry), picker, icons
     compose/             renderComposite (canvas), filters (CSS lists → color matrices), fonts,
                          design defaults, crop math, logo store
     review/              review screen, customizer, debounced export rendering, gallery autosave
     export/              file names + download, Web Share, print
     gallery/             IndexedDB store, gallery screen and viewer
+    pair/                shared booth: room codes, message protocol + validation, photo framing,
+                         clock sync, PeerJS link, store (host decisions, photo exchange), dialog,
+                         split preview
   store/settings.ts      persisted settings (zustand + localStorage)
   lib/                   platform detection, canvas helpers, router, hooks
 ```

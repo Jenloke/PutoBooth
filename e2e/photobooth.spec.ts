@@ -1,55 +1,6 @@
-import { readFile } from "node:fs/promises"
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
-/** Width and height from a PNG's IHDR chunk. */
-function pngSize(png: Buffer) {
-  expect(png.subarray(1, 4).toString("ascii")).toBe("PNG")
-  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) }
-}
-
-function collectErrors(page: Page) {
-  const errors: string[] = []
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text())
-  })
-  page.on("pageerror", (error) => errors.push(String(error)))
-  return errors
-}
-
-/** Watches for requests that carry image data anywhere but this origin's static files. */
-function collectUploads(page: Page) {
-  const uploads: string[] = []
-  page.on("request", (request) => {
-    const body = request.postDataBuffer()
-    if (request.method() !== "GET" || (body && body.length > 0)) uploads.push(`${request.method()} ${request.url()}`)
-  })
-  return uploads
-}
-
-async function openBooth(page: Page) {
-  await page.addInitScript(() => {
-    // Shortest timings so a full session takes seconds.
-    localStorage.setItem(
-      "photobooth-settings",
-      JSON.stringify({ state: { countdown: 3, pauseSeconds: 0.5, flash: false }, version: 1 })
-    )
-  })
-  await page.goto("/")
-  const shutter = page.getByRole("button", { name: "Take photos" })
-  await expect(shutter).toBeVisible()
-  const start = page.getByRole("button", { name: "Start camera" })
-  if (await start.isVisible()) await start.click()
-  await expect(shutter).toBeEnabled()
-  return shutter
-}
-
-async function downloadPng(page: Page) {
-  const button = page.getByRole("button", { name: "Download" })
-  await expect(button).toBeEnabled()
-  const [download] = await Promise.all([page.waitForEvent("download"), button.click()])
-  const path = await download.path()
-  return { name: download.suggestedFilename(), size: pngSize(await readFile(path)) }
-}
+import { collectErrors, collectUploads, downloadPng, openBooth } from "./helpers.ts"
 
 test("Classic Strip session downloads a 600×1800 PNG and a 1200×1800 print sheet", async ({ page }) => {
   const errors = collectErrors(page)

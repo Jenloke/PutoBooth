@@ -16,20 +16,8 @@ type CameraPreviewProps = {
   className?: string
 }
 
-/**
- * Live preview, cropped to the slot aspect with object-fit: cover. Sized as the largest box
- * of that aspect that fits the parent, which must be a size container (`[container-type:size]`).
- */
-export function CameraPreview({
-  stream,
-  aspect,
-  mirrored,
-  filter,
-  grid,
-  videoRef,
-  children,
-  className,
-}: CameraPreviewProps) {
+/** Plays `stream` in the video element, and resumes it when Safari paused it in the background. */
+export function useVideoStream(videoRef: RefObject<HTMLVideoElement | null>, stream: MediaStream | null) {
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -48,6 +36,23 @@ export function CameraPreview({
     document.addEventListener("visibilitychange", onVisible)
     return () => document.removeEventListener("visibilitychange", onVisible)
   }, [stream, videoRef])
+}
+
+/**
+ * Live preview, cropped to the slot aspect with object-fit: cover. Sized as the largest box
+ * of that aspect that fits the parent, which must be a size container (`[container-type:size]`).
+ */
+export function CameraPreview({
+  stream,
+  aspect,
+  mirrored,
+  filter,
+  grid,
+  videoRef,
+  children,
+  className,
+}: CameraPreviewProps) {
+  useVideoStream(videoRef, stream)
 
   return (
     <div
@@ -73,7 +78,7 @@ export function CameraPreview({
   )
 }
 
-function GridOverlay() {
+export function GridOverlay() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0">
       <div className="absolute inset-y-0 left-1/3 w-px bg-white/40" />

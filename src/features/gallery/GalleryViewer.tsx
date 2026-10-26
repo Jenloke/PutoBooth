@@ -24,9 +24,26 @@ import { navigate } from "@/lib/router"
 import { useObjectUrl } from "@/lib/useObjectUrl"
 import { useSettings } from "@/store/settings"
 
-import { readGalleryData, useGallery, type GalleryData, type GalleryMeta, type GalleryShot } from "./galleryStore"
+import {
+  readGalleryData,
+  useGallery,
+  type GalleryData,
+  type GalleryMeta,
+  type GalleryShot,
+  type PartnerShots,
+} from "./galleryStore"
 
-type Loaded = { id: string; file: File; data: GalleryData; shots: GalleryShot[] | undefined }
+type Loaded = {
+  id: string
+  file: File
+  data: GalleryData
+  shots: GalleryShot[] | undefined
+  partner: PartnerShots | undefined
+}
+
+function toShot(s: GalleryShot): Shot {
+  return { id: uid(), blob: s.blob, url: URL.createObjectURL(s.blob), width: s.width, height: s.height }
+}
 
 type GalleryViewerProps = {
   item: GalleryMeta | null
@@ -44,12 +61,12 @@ export function GalleryViewer({ item, onClose }: GalleryViewerProps) {
     if (!item) return
     let cancelled = false
     readGalleryData(item.id)
-      .then(({ data, shots }) => {
+      .then(({ data, shots, partner }) => {
         if (cancelled) return
         if (!data) throw new Error("missing")
         // Re-wrap so the share sheet always gets the right name and type.
         const file = new File([data.result], item.fileName, { type: item.mime, lastModified: item.takenAt })
-        setLoaded({ id: item.id, file, data, shots })
+        setLoaded({ id: item.id, file, data, shots, partner })
       })
       .catch(() => {
         if (!cancelled) toast.error("Couldn't open this photo")
@@ -78,15 +95,21 @@ export function GalleryViewer({ item, onClose }: GalleryViewerProps) {
 
   const edit = () => {
     if (!item || !current?.shots?.length || !isLayoutId(item.layoutId)) return
-    const shots: Shot[] = current.shots.map((s) => ({
-      id: uid(),
-      blob: s.blob,
-      url: URL.createObjectURL(s.blob),
-      width: s.width,
-      height: s.height,
-    }))
+    const shots = current.shots.map(toShot)
+    // A shared session comes back with both halves; retakes then reshoot this device's half.
+    const pair =
+      item.pair && current.partner
+        ? {
+            side: item.pair.side,
+            partnerName: item.pair.partnerName,
+            shots: shots.map((_, i) => {
+              const s = current.partner?.[i]
+              return s ? toShot(s) : null
+            }),
+          }
+        : null
     useSettings.getState().update({ design: sanitizeDesign(current.data.design), printSheet: item.printSheet })
-    useSession.getState().load({ id: item.id, layoutId: item.layoutId, shots, takenAt: item.takenAt })
+    useSession.getState().load({ id: item.id, layoutId: item.layoutId, shots, takenAt: item.takenAt, pair })
     onClose()
     navigate("/")
   }
@@ -105,6 +128,7 @@ export function GalleryViewer({ item, onClose }: GalleryViewerProps) {
           <DialogTitle>{layout?.name ?? "Photo"}</DialogTitle>
           <DialogDescription>
             {item && new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(item.takenAt)}
+            {item?.pair && ` · with ${item.pair.partnerName || "a partner"}`}
             {item && ` · ${item.width}×${item.height} px`}
           </DialogDescription>
         </DialogHeader>

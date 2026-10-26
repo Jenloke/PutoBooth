@@ -1,16 +1,5 @@
-import {
-  computeLayout,
-  computePrintSheet,
-  type ComputedLayout,
-  type Rect,
-} from "@/features/layouts/computeLayout"
-import {
-  PRINT_DPI,
-  PRINT_SHEET,
-  withPadding,
-  type FooterArrangement,
-  type LayoutSpec,
-} from "@/features/layouts/layouts"
+import { compositeGeometry, computePrintSheet, slotParts, type Rect } from "@/features/layouts/computeLayout"
+import { PRINT_DPI, PRINT_SHEET, type FooterArrangement, type LayoutSpec } from "@/features/layouts/layouts"
 import {
   context2d,
   createCanvas,
@@ -29,19 +18,20 @@ import {
 import { applyFilterToPixels, getFilter, type FilterOp } from "./filters"
 import { canvasFont, getFont, loadFont, type FontDef } from "./fonts"
 
+/**
+ * The photos of one slot: one, or two side by side for a shared booth (stacked in portrait
+ * slots, see slotParts). A missing photo renders as an empty placeholder.
+ */
+export type SlotImages = readonly (DecodedImage | null)[]
+
 export interface CompositeInput {
   layout: LayoutSpec
-  /** Decoded shots in slot order; missing shots render as an empty slot. */
-  images: readonly (DecodedImage | null)[]
+  /** Decoded photos in slot order. */
+  slots: readonly SlotImages[]
   design: Design
   /** Printed by the date stamp (the session's capture date). */
   date: Date
   logo: DecodedImage | null
-}
-
-/** Geometry the compositor uses for a design: the layout with the design's padding applied. */
-export function compositeGeometry(layout: LayoutSpec, design: Pick<Design, "padding">): ComputedLayout {
-  return computeLayout(withPadding(layout, design.padding), PRINT_DPI)
 }
 
 /**
@@ -49,7 +39,7 @@ export function compositeGeometry(layout: LayoutSpec, design: Pick<Design, "padd
  * the app theme). The caller owns the returned canvas and should free it when done.
  */
 export async function renderComposite(input: CompositeInput): Promise<HTMLCanvasElement> {
-  const { layout, images, design, date, logo } = input
+  const { layout, slots, design, date, logo } = input
   const geometry = compositeGeometry(layout, design)
   const font = getFont(design.font)
   const caption = design.caption.trim()
@@ -67,7 +57,7 @@ export async function renderComposite(input: CompositeInput): Promise<HTMLCanvas
   const ops = getFilter(design.filter).ops
   geometry.slots.forEach((slot, index) => {
     const radius = design.radius * MAX_RADIUS_FRACTION * Math.min(slot.w, slot.h)
-    drawPhoto(ctx, images[index] ?? null, slot, ops, radius)
+    drawSlot(ctx, slot, slots[index] ?? [], design.padding, ops, radius)
   })
 
   if (geometry.footer && layout.footer) {
@@ -94,10 +84,12 @@ export function renderPrintSheet(strip: HTMLCanvasElement): HTMLCanvasElement {
   return canvas
 }
 
-function drawPhoto(
+/** One slot, rounded as a whole; shared slots show the frame color in the seam between photos. */
+function drawSlot(
   ctx: CanvasRenderingContext2D,
-  image: DecodedImage | null,
   slot: Rect,
+  images: SlotImages,
+  padding: number,
   ops: readonly FilterOp[],
   radius: number
 ) {
@@ -106,24 +98,29 @@ function drawPhoto(
     roundRectPath(ctx, slot.x, slot.y, slot.w, slot.h, radius)
     ctx.clip()
   }
+  slotParts(slot, Math.max(1, images.length), padding).forEach((rect, i) => {
+    drawPhoto(ctx, images[i] ?? null, rect, ops)
+  })
+  ctx.restore()
+}
+
+function drawPhoto(ctx: CanvasRenderingContext2D, image: DecodedImage | null, rect: Rect, ops: readonly FilterOp[]) {
   if (!image) {
     ctx.fillStyle = "#d4d4d4"
-    ctx.fillRect(slot.x, slot.y, slot.w, slot.h)
-    ctx.restore()
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h)
     return
   }
-  // Filter in a slot-sized scratch canvas: getImageData/putImageData ignore clipping, so
+  // Filter in a photo-sized scratch canvas: getImageData/putImageData ignore clipping, so
   // filtering in place would also tint the frame around rounded corners.
-  const photo = scaleCover(image, slot.w, slot.h, ops.length > 0)
+  const photo = scaleCover(image, rect.w, rect.h, ops.length > 0)
   if (ops.length > 0) {
     const pctx = context2d(photo, { willReadFrequently: true })
     const pixels = pctx.getImageData(0, 0, photo.width, photo.height)
     applyFilterToPixels(pixels.data, ops)
     pctx.putImageData(pixels, 0, 0)
   }
-  ctx.drawImage(photo, slot.x, slot.y, slot.w, slot.h)
+  ctx.drawImage(photo, rect.x, rect.y, rect.w, rect.h)
   freeCanvas(photo)
-  ctx.restore()
 }
 
 /**
