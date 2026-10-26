@@ -10,10 +10,12 @@ type CameraGateProps = {
   status: CameraStatus
   muted: boolean
   onStart: () => void
+  /** Replaces the privacy note (the shared booth sends photos to the partner's device). */
+  note?: string
 }
 
 /** Overlay inside the preview box until the camera is live: start button or progress. */
-export function CameraGate({ status, muted, onStart }: CameraGateProps) {
+export function CameraGate({ status, muted, onStart, note }: CameraGateProps) {
   if (status === "live" && !muted) return null
 
   if (status === "live" && muted) {
@@ -46,7 +48,7 @@ export function CameraGate({ status, muted, onStart }: CameraGateProps) {
           <CameraIcon className="size-6" />
         </span>
         <p className="text-sm text-white/75 phone-landscape:hidden">
-          Photos are taken and processed on this device. Nothing is uploaded.
+          {note ?? "Photos are taken and processed on this device. Nothing is uploaded."}
         </p>
         <Button
           size="lg"
