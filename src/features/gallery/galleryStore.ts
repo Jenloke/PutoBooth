@@ -3,6 +3,7 @@ import { create } from "zustand"
 
 import type { Design } from "@/features/compose/design"
 import type { LayoutId } from "@/features/layouts/layouts"
+import type { Side } from "@/features/pair/protocol"
 import { requestPersistentStorage } from "@/lib/platform"
 
 /**
@@ -10,7 +11,8 @@ import { requestPersistentStorage } from "@/lib/platform"
  * aren't used for a while, so the UI treats this as a convenience and nudges people to save.
  *
  * Small `meta:` records list the gallery without loading images; `data:` holds the result,
- * `shots:` the full frames (for re-editing).
+ * `shots:` the full frames (for re-editing), and `partner:` the other device's frames of a
+ * shared booth session.
  */
 const db = createStore("photobooth-gallery", "entries")
 
@@ -28,6 +30,8 @@ export interface GalleryMeta {
   printSheet: boolean
   /** Small JPEG for the grid. */
   thumb: Blob
+  /** Shot in a shared booth: which half was this device's, and who was in the other. */
+  pair?: { side: Side; partnerName: string }
 }
 
 export interface GalleryData {
@@ -44,10 +48,21 @@ export interface GalleryShot {
 const metaKey = (id: string) => `meta:${id}`
 const dataKey = (id: string) => `data:${id}`
 const shotsKey = (id: string) => `shots:${id}`
+const partnerKey = (id: string) => `partner:${id}`
+
+/** The partner's frames, one per slot; a photo that never arrived is null. */
+export type PartnerShots = (GalleryShot | null)[]
 
 export async function readGalleryData(id: string) {
-  const [data, shots] = await getMany<GalleryData | GalleryShot[] | undefined>([dataKey(id), shotsKey(id)], db)
-  return { data: data as GalleryData | undefined, shots: shots as GalleryShot[] | undefined }
+  const [data, shots, partner] = await getMany<GalleryData | GalleryShot[] | PartnerShots | undefined>(
+    [dataKey(id), shotsKey(id), partnerKey(id)],
+    db
+  )
+  return {
+    data: data as GalleryData | undefined,
+    shots: shots as GalleryShot[] | undefined,
+    partner: partner as PartnerShots | undefined,
+  }
 }
 
 export class StorageFullError extends Error {}
@@ -63,8 +78,8 @@ interface GalleryStore {
   items: GalleryMeta[]
   loaded: boolean
   refresh: () => Promise<void>
-  /** Saves or replaces an entry. Pass `shots` only when they changed (they're large). */
-  save: (meta: GalleryMeta, data: GalleryData, shots?: GalleryShot[]) => Promise<void>
+  /** Saves or replaces an entry. Pass `frames` only when they changed (they're large). */
+  save: (meta: GalleryMeta, data: GalleryData, frames?: { shots: GalleryShot[]; partner: PartnerShots | null }) => Promise<void>
   remove: (id: string) => Promise<void>
   clearAll: () => Promise<void>
 }
@@ -85,12 +100,15 @@ export const useGallery = create<GalleryStore>()((set, getState) => ({
     set({ items: metas, loaded: true })
   },
 
-  save: async (meta, data, shots) => {
+  save: async (meta, data, frames) => {
     const entries: [string, unknown][] = [
       [metaKey(meta.id), meta],
       [dataKey(meta.id), data],
     ]
-    if (shots) entries.push([shotsKey(meta.id), shots])
+    if (frames) {
+      entries.push([shotsKey(meta.id), frames.shots])
+      if (frames.partner) entries.push([partnerKey(meta.id), frames.partner])
+    }
     try {
       await setMany(entries, db)
     } catch (error) {
@@ -105,7 +123,7 @@ export const useGallery = create<GalleryStore>()((set, getState) => ({
   },
 
   remove: async (id) => {
-    await delMany([metaKey(id), dataKey(id), shotsKey(id)], db)
+    await delMany([metaKey(id), dataKey(id), shotsKey(id), partnerKey(id)], db)
     set({ items: getState().items.filter((item) => item.id !== id) })
   },
 

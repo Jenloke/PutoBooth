@@ -169,7 +169,10 @@ function GalleryTile({ item, onOpen }: { item: GalleryMeta; onOpen: () => void }
       </span>
       <span className="flex flex-col px-1">
         <span className="text-sm font-medium">{layout.name}</span>
-        <span className="text-xs text-muted-foreground">{dateFormat.format(item.takenAt)}</span>
+        <span className="text-xs text-muted-foreground">
+          {dateFormat.format(item.takenAt)}
+          {item.pair && ` · with ${item.pair.partnerName || "a partner"}`}
+        </span>
       </span>
     </button>
   )

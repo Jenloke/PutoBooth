@@ -7,10 +7,12 @@ import {
   SquarePlusIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useShallow } from "zustand/react/shallow"
 
 import { AppHeader } from "@/components/app-header"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
+import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "@/features/booth/session"
 import { useLogo } from "@/features/compose/logoStore"
@@ -25,6 +27,7 @@ import {
   isStrip,
   printSizeInches,
 } from "@/features/layouts/layouts"
+import { isLinked, partnerLabel, usePair } from "@/features/pair/pairStore"
 import { canShareFiles, isIOS } from "@/lib/platform"
 import { navigate } from "@/lib/router"
 import { useHotkeys } from "@/lib/useHotkeys"
@@ -45,16 +48,32 @@ export function ReviewScreen() {
   const printSheetSetting = useSettings((s) => s.printSheet)
   const logo = useLogo((s) => s.blob)
   const touch = useMediaQuery("(pointer: coarse)")
+  const pair = usePair(
+    useShallow((s) => ({ status: s.status, jointId: s.jointId, partner: s.partner, partnerName: s.partnerName }))
+  )
 
   useEffect(() => {
     void useLogo.getState().load()
   }, [])
+
+  // While paired, retakes are shot together: only the shared session's photos can be retaken,
+  // and "Retake all" starts a new round for both.
+  const linked = isLinked(pair.status)
+  const connected = pair.status === "connected"
+  const joint = session.pair !== null && session.id === pair.jointId
+  const partnerName = session.pair?.partnerName || partnerLabel(pair)
+  const retakeOne = !linked ? session.retake : connected && joint ? (i: number) => usePair.getState().retake(i) : null
+  const retakeAll = !linked ? () => session.retakeAll() : connected ? () => usePair.getState().retake(null) : null
+  const partnerReceived = session.pair?.shots.filter(Boolean).length ?? 0
+  const partnerMissing = session.pair ? session.pair.shots.length - partnerReceived : 0
+  const receiving = partnerMissing > 0 && joint && linked
 
   const layout = getLayout(session.layoutId)
   const sheet = printSheetSetting && isStrip(layout)
   const { result, stale, error } = useComposite({
     layout,
     shots: session.shots,
+    pair: session.pair,
     design,
     takenAt: session.takenAt,
     logo,
@@ -84,6 +103,7 @@ export function ReviewScreen() {
     sessionId: session.id,
     layoutId: session.layoutId,
     shots: session.shots,
+    pair: session.pair,
     takenAt: session.takenAt,
     design,
     printSheet: sheet,
@@ -118,8 +138,6 @@ export function ReviewScreen() {
     if (ready) printNow()
   }
 
-  const retakeAll = () => session.retakeAll()
-
   const startOver = () => {
     session.startOver()
     toast("Saved in your gallery", {
@@ -131,8 +149,8 @@ export function ReviewScreen() {
   useHotkeys({
     r: () => {
       const focused = document.activeElement?.getAttribute("data-retake-index")
-      if (focused != null) session.retake(Number(focused))
-      else retakeAll()
+      if (focused != null) retakeOne?.(Number(focused))
+      else retakeAll?.()
     },
     s: () => (primary === "share" ? share() : download()),
   })
@@ -177,10 +195,25 @@ export function ReviewScreen() {
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row phone-landscape:flex-row">
         <section aria-label="Result" className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-2 px-4 pt-3">
-            <p className="text-sm text-muted-foreground">{touch ? "Tap" : "Click"} a photo to retake it</p>
+            <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+              {receiving ? (
+                <>
+                  <Spinner className="size-3.5" />
+                  Receiving {partnerName}'s photos… {partnerReceived} of {session.pair!.shots.length}
+                </>
+              ) : partnerMissing > 0 ? (
+                `${partnerMissing} of ${partnerName}'s photos didn't arrive`
+              ) : linked && !connected ? (
+                `Reconnecting to ${partnerName}…`
+              ) : !retakeOne ? (
+                `Retake all to shoot a new round with ${partnerLabel(pair)}`
+              ) : (
+                `${touch ? "Tap" : "Click"} a photo to retake it${linked ? ` with ${partnerName}` : ""}`
+              )}
+            </p>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" onClick={retakeAll}>
+                <Button variant="ghost" onClick={() => retakeAll?.()} disabled={!retakeAll}>
                   <RotateCcwIcon />
                   Retake all
                 </Button>
@@ -198,7 +231,8 @@ export function ReviewScreen() {
               placements={placements}
               geometry={geometry}
               rendering={stale}
-              onRetake={session.retake}
+              onRetake={(index) => retakeOne?.(index)}
+              disabled={!retakeOne}
               alt={`${layout.name} with ${session.shots.length} ${session.shots.length === 1 ? "photo" : "photos"}`}
             />
           </div>

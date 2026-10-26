@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import type { Shot } from "@/features/booth/session"
+import { slotShots, type PairShots, type Shot } from "@/features/booth/session"
 import type { Design } from "@/features/compose/design"
 import { renderComposite, renderPrintSheet } from "@/features/compose/renderComposite"
 import { mimeFor, resultFileName } from "@/features/export/export"
@@ -18,6 +18,8 @@ import type { ExportFormat } from "@/store/settings"
 export interface CompositeParams {
   layout: LayoutSpec
   shots: readonly (Shot | null)[]
+  /** Shared booth: the partner's photos, drawn beside this device's in every slot. */
+  pair: Pick<PairShots, "side" | "shots"> | null
   design: Design
   takenAt: number
   logo: Blob | null
@@ -91,9 +93,11 @@ async function makeThumb(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 async function compose(params: CompositeParams, key: string, cache: DecodeCache): Promise<CompositeResult> {
-  const { layout, shots, design, takenAt, logo, format, quality } = params
+  const { layout, shots, pair, design, takenAt, logo, format, quality } = params
   const sheet = params.printSheet && isStrip(layout)
-  const slots = await Promise.all(shots.map(async (shot) => [shot ? await cache.shot(shot) : null]))
+  const slots = await Promise.all(
+    slotShots(shots, pair).map((parts) => Promise.all(parts.map((shot) => (shot ? cache.shot(shot) : null))))
+  )
   const logoImage = logo && design.showLogo ? await cache.logo(logo) : null
 
   let canvas = await renderComposite({
@@ -129,6 +133,7 @@ function compositeKey(p: CompositeParams): string {
   return JSON.stringify([
     p.layout.id,
     p.shots.map((s) => s?.id ?? null),
+    p.pair ? [p.pair.side, p.pair.shots.map((s) => s?.id ?? null)] : null,
     p.design,
     p.takenAt,
     // A new logo is always a new Blob; size + type tells them apart without hashing.
@@ -144,7 +149,7 @@ function compositeKey(p: CompositeParams): string {
  * this image, so the preview is the export.
  */
 export function useComposite(params: CompositeParams) {
-  const { layout, shots, design, takenAt, logo, format, quality, printSheet } = params
+  const { layout, shots, pair, design, takenAt, logo, format, quality, printSheet } = params
   const [cache] = useState(() => new DecodeCache())
   const [result, setResult] = useState<CompositeResult | null>(null)
   const [error, setError] = useState<{ key: string; error: Error } | null>(null)
@@ -152,13 +157,14 @@ export function useComposite(params: CompositeParams) {
   const rendered = useRef(false)
 
   const inputs = useMemo(
-    () => ({ layout, shots, design, takenAt, logo, format, quality, printSheet }),
-    [layout, shots, design, takenAt, logo, format, quality, printSheet]
+    () => ({ layout, shots, pair, design, takenAt, logo, format, quality, printSheet }),
+    [layout, shots, pair, design, takenAt, logo, format, quality, printSheet]
   )
   const key = useMemo(() => compositeKey(inputs), [inputs])
 
   useEffect(() => {
-    cache.keep(new Set(inputs.shots.flatMap((s) => (s ? [s.id] : []))), queue.current)
+    const ids = [...inputs.shots, ...(inputs.pair?.shots ?? [])].flatMap((s) => (s ? [s.id] : []))
+    cache.keep(new Set(ids), queue.current)
 
     let cancelled = false
     const run = async () => {
