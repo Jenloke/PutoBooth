@@ -9,4 +9,6 @@ interface ImportMetaEnv {
   readonly VITE_PEER_SECURE?: string
   /** JSON array of RTCIceServer objects (e.g. your own TURN server); "[]" for none. */
   readonly VITE_ICE_SERVERS?: string
+  /** Set by Vercel on its builds ("production", "preview" or "development"); turns on Web Analytics. */
+  readonly VITE_VERCEL_ENV?: string
 }

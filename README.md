@@ -8,14 +8,17 @@ Two people can also **shoot together on two devices**: each fills one half of ev
 the countdown runs on both screens at once, and both get the strip (see
 [Shared booth](#shared-booth)).
 
-Everything happens on the device. There is no backend, nothing is uploaded, and the site
+Everything happens on the device. There is no backend, no photo is ever uploaded, and the site
 deploys to Vercel as static files. In a shared booth, photos go straight to the other device.
+The deployed site counts page views with [Vercel Web Analytics](#web-analytics): no cookies, and
+no photos, names or room codes.
 
 - **Stack:** Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), lucide-react,
-  zustand, idb-keyval, vite-plugin-pwa, PeerJS (WebRTC), uqr, self-hosted fonts via @fontsource.
-- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP, and the shared booth's
-  protocol, framing, clock sync and timeline) and Playwright (full sessions with Chromium's fake
-  camera, including two browsers sharing a booth).
+  zustand, idb-keyval, vite-plugin-pwa, PeerJS (WebRTC), uqr, @vercel/analytics, self-hosted fonts
+  via @fontsource.
+- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP, the SPA rewrite, analytics,
+  and the shared booth's protocol, framing, clock sync and timeline) and Playwright (full sessions
+  with Chromium's fake camera, including two browsers sharing a booth).
 
 ## Quick start
 
@@ -39,9 +42,9 @@ Node 22 is required (`engines.node` is `22.x`, which Vercel also uses).
 
 ## Deploying to Vercel
 
-The repo is a plain static Vite site: no server functions or analytics, and no environment
-variables are needed (the shared booth has optional ones, see below). `vercel.json` holds the
-rewrite, cache and security headers.
+The repo is a plain static Vite site: no server functions, and no environment variables are
+needed (the shared booth has optional ones, see below). `vercel.json` holds the rewrite, cache
+and security headers.
 
 ### One-time setup (Git integration)
 
@@ -52,6 +55,8 @@ rewrite, cache and security headers.
 4. Deploy. From then on:
    - every push to `main` deploys to **production**;
    - every other branch and every pull request gets its own HTTPS **preview URL**.
+5. Open the project's **Analytics** tab, select **Enable**, and redeploy (see
+   [Web analytics](#web-analytics)).
 
 The camera requires HTTPS, and every Vercel URL is HTTPS.
 
@@ -77,7 +82,9 @@ npx vercel --prod   # production deployment
 ### What `vercel.json` does
 
 - **SPA fallback.** Every path rewrites to `/index.html`, so reloading `/gallery` works.
-  Real files in `dist/` are served first.
+  Real files in `dist/` are served first. Vercel's own `/_vercel/*` routes (Web Analytics) are
+  left out, or the analytics script would come back as the app's HTML. `tests/vercel.test.ts`
+  checks both.
 - **Caching.**
   - `/assets/*` has hashed file names, so it's cached for a year as `immutable`.
   - `/sw.js` and `/manifest.webmanifest` are `no-cache`, so installed apps notice new deploys.
@@ -86,11 +93,32 @@ npx vercel --prod   # production deployment
     app itself; everything else is disabled.
   - The CSP allows `blob:` and `data:` images, which the shots and previews use. It does not
     allow `unsafe-inline` for scripts.
-  - `connect-src` allows only the app itself and `wss://0.peerjs.com`, the shared booth's
-    signaling server. `tests/csp.test.ts` checks it matches `src/features/pair/config.ts`.
+  - `connect-src` allows only the app itself (which covers Web Analytics) and
+    `wss://0.peerjs.com`, the shared booth's signaling server. `tests/csp.test.ts` checks it
+    matches `src/features/pair/config.ts`.
   - The one inline script, the no-flash theme snippet in `index.html`, is allowed by its sha256
     hash. If you edit that script, update the hash in `vercel.json`. `tests/csp.test.ts` fails
     until they match, and prints the hash it expects.
+
+### Web analytics
+
+The deployed site uses [Vercel Web Analytics](https://vercel.com/docs/analytics) to count
+visitors and page views. It sets no cookies and reports the page (`/` or `/gallery`), referrer,
+country, browser and device type. Photos, display names, room codes and anything else in the app
+are never sent.
+
+- **Turning it on.** Enable it in the project's **Analytics** tab, then redeploy. Until then the
+  script request returns 404 and nothing is counted.
+- **Where it runs.** `src/lib/analytics.ts` loads the script only in builds Vercel makes for
+  production and preview deployments, which it recognizes by `VITE_VERCEL_ENV` (Vercel sets it
+  while **Automatically expose System Environment Variables** is on, the default). The dev
+  server, `npm run preview` and the end-to-end tests never load it, and make no analytics
+  requests. Preview traffic is reported too; the dashboard filters by environment.
+- **Same origin.** The script and its reports use `/_vercel/insights/*` on the site's own domain,
+  so the CSP needs no extra hosts. Ad blockers may still block it, so the numbers run low.
+- **Invite codes.** An invite link carries its room code (`/?join=CODE`). The app removes it from
+  the address bar before analytics starts, and a `beforeSend` hook strips it from every event in
+  case that ever changes.
 
 ### Updates to the installed app
 
