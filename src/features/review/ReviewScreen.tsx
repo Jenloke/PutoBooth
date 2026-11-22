@@ -28,6 +28,7 @@ import {
   printSizeInches,
 } from "@/features/layouts/layouts"
 import { isLinked, partnerLabel, usePair } from "@/features/pair/pairStore"
+import { trackEvent, type SaveMethod } from "@/lib/analytics"
 import { canShareFiles, isIOS } from "@/lib/platform"
 import { navigate } from "@/lib/router"
 import { useHotkeys } from "@/lib/useHotkeys"
@@ -115,10 +116,14 @@ export function ReviewScreen() {
     if (error) toast.error("Couldn't render the image", { id: "render-error", description: error.message })
   }, [error])
 
+  const saved = (method: SaveMethod) =>
+    trackEvent("strip_saved", { method, source: session.pair ? "shared" : "camera" })
+
   const download = () => {
     if (!result || stale) return
     downloadFile(result.file, result.url)
     toast.success("Downloaded", { description: result.file.name })
+    saved("download")
   }
 
   const share = () => {
@@ -130,12 +135,17 @@ export function ReviewScreen() {
       if (outcome === "unsupported" || outcome === "failed") {
         downloadFile(file, url)
         toast("Sharing isn't available here, so it was downloaded instead.")
+        saved("download")
+      } else if (outcome === "shared") {
+        saved("share")
       }
     })
   }
 
   const print = () => {
-    if (ready) printNow()
+    if (!ready) return
+    printNow()
+    saved("print")
   }
 
   const startOver = () => {

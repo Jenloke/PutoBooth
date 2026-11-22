@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, type RefObject } from "react"
 import { toast } from "sonner"
 
 import { captureFrame } from "@/features/camera/captureFrame"
+import { trackEvent } from "@/lib/analytics"
 import { uid } from "@/lib/id"
 import { useSettings } from "@/store/settings"
 
@@ -100,8 +101,16 @@ export function useBoothSession(videoRef: RefObject<HTMLVideoElement | null>, op
       abortRun()
       const controller = new AbortController()
       activeRun = controller
+      // A full sequence (not a single retake) that reaches review is a finished strip.
+      const full = useSession.getState().retakeIndex === null
 
       runTimeline(timeline, videoRef, mirror, controller.signal)
+        .then(() => {
+          const { phase, layoutId, pair } = useSession.getState()
+          if (full && !controller.signal.aborted && phase === "review") {
+            trackEvent("strip_done", { layout: layoutId, shared: pair !== null })
+          }
+        })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return
           useSession.getState().cancel()

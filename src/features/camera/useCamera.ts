@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
 
-import { hasCameraApi, isSecureContextForCamera } from "@/lib/platform"
+import { trackOnce } from "@/lib/analytics"
+import { hasCameraApi, inAppBrowser, isSecureContextForCamera } from "@/lib/platform"
 import type { Facing } from "@/store/settings"
 
 import { cameraError, toCameraError, type CameraError } from "./cameraErrors"
@@ -302,7 +303,9 @@ export function useCamera(prefs: CameraPrefs): UseCamera {
   useEffect(() => {
     let cancelled = false
     void cameraPermissionGranted().then((granted) => {
-      if (granted && !cancelled) void controller.start()
+      if (!granted || cancelled) return
+      trackOnce("camera_start", { auto: true })
+      void controller.start()
     })
     return () => {
       cancelled = true
@@ -310,12 +313,21 @@ export function useCamera(prefs: CameraPrefs): UseCamera {
     }
   }, [controller])
 
+  // Once per kind per page load: a retry loop shouldn't inflate the count.
+  const errorKind = snapshot.error?.kind
+  useEffect(() => {
+    if (errorKind) trackOnce("camera_error", { kind: errorKind, app: inAppBrowser() ?? "none" }, errorKind)
+  }, [errorKind])
+
   useEffect(() => {
     controller.setHighRes(prefs.highRes)
   }, [controller, prefs.highRes])
 
   const [actions] = useState(() => ({
-    start: () => void controller.start(),
+    start: () => {
+      trackOnce("camera_start", { auto: false })
+      void controller.start()
+    },
     stop: () => controller.stop(),
     selectDevice: (deviceId: string) => controller.selectDevice(deviceId),
     flip: () => controller.flip(),

@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { analyticsEnabled, scrubEvent } from "./analytics"
+const { track } = vi.hoisted(() => ({ track: vi.fn() }))
+vi.mock("@vercel/analytics", () => ({ inject: vi.fn(), track }))
+vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }))
+
+import { analyticsEnabled, scrubEvent, trackEvent, trackOnce } from "./analytics"
+
+const VERCEL = { VITE_VERCEL_ENV: "production" } as ImportMetaEnv
+const LOCAL = {} as ImportMetaEnv
 
 describe("analyticsEnabled", () => {
   it("is on for Vercel production and preview deployments", () => {
@@ -43,5 +50,38 @@ describe("scrubEvent", () => {
       url: "https://booth.example/gallery?utm_source=qr",
     } as const
     expect(scrubEvent(event)).toBe(event)
+  })
+
+  it("scrubs Speed Insights vitals too", () => {
+    const event = scrubEvent({ type: "vital", url: "https://booth.example/?join=K7M4QD", route: "/" })
+    expect(event).toEqual({ type: "vital", url: "https://booth.example/", route: "/" })
+  })
+})
+
+describe("trackEvent", () => {
+  beforeEach(() => track.mockClear())
+
+  it("reports funnel events on Vercel deployments", () => {
+    trackEvent("strip_saved", { method: "share", source: "camera" }, VERCEL)
+    expect(track).toHaveBeenCalledWith("strip_saved", { method: "share", source: "camera" })
+  })
+
+  it("does nothing where analytics is off", () => {
+    trackEvent("strip_saved", { method: "share", source: "camera" }, LOCAL)
+    expect(track).not.toHaveBeenCalled()
+  })
+
+  it("never throws, even if the analytics script does", () => {
+    track.mockImplementationOnce(() => {
+      throw new Error("blocked")
+    })
+    expect(() => trackEvent("camera_start", { auto: false }, VERCEL)).not.toThrow()
+  })
+
+  it("reports a once-per-load event a single time per key", () => {
+    trackOnce("camera_error", { kind: "denied", app: "none" }, "denied", VERCEL)
+    trackOnce("camera_error", { kind: "denied", app: "none" }, "denied", VERCEL)
+    trackOnce("camera_error", { kind: "busy", app: "none" }, "busy", VERCEL)
+    expect(track).toHaveBeenCalledTimes(2)
   })
 })

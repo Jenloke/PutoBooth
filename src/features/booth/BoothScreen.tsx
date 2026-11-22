@@ -29,6 +29,7 @@ import { PairPreview, PartnerWaiting } from "@/features/pair/PairPreview"
 import { isLinked, partnerLabel, usePair } from "@/features/pair/pairStore"
 import { startBlocker } from "@/features/pair/presence"
 import { sideOf, type Side } from "@/features/pair/protocol"
+import { trackEvent } from "@/lib/analytics"
 import { useHotkeys } from "@/lib/useHotkeys"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { useWakeLock } from "@/lib/useWakeLock"
@@ -121,6 +122,7 @@ export function BoothScreen() {
     if (!canShoot || shooting) return
     if (settings.sound) unlockAudio()
     setSettingsOpen(false)
+    if (!retaking) trackEvent("shoot_start", { layout: session.layoutId, shared: linked })
     if (linked) usePair.getState().shoot()
     else runner.start({ mirror: mirrorShots })
   }
