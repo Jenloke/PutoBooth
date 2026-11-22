@@ -1,4 +1,4 @@
-import { RotateCcwIcon } from "lucide-react"
+import { ImageUpIcon, RotateCcwIcon } from "lucide-react"
 
 import { Spinner } from "@/components/ui/spinner"
 import type { ComputedLayout, Rect } from "@/features/layouts/computeLayout"
@@ -15,6 +15,8 @@ type ResultPreviewProps = {
   geometry: ComputedLayout
   rendering: boolean
   onRetake: (index: number) => void
+  /** What tapping a photo does: retake it with the camera, or replace it from the library. */
+  action?: "retake" | "replace"
   disabled?: boolean
   alt: string
 }
@@ -31,9 +33,11 @@ export function ResultPreview({
   geometry,
   rendering,
   onRetake,
+  action = "retake",
   disabled,
   alt,
 }: ResultPreviewProps) {
+  const verb = action === "replace" ? "Replace" : "Retake"
   return (
     <div
       className="fit-box relative rounded-sm bg-muted shadow-[0_10px_40px_-12px_rgb(0_0_0/0.35)] ring-1 ring-black/10 dark:ring-white/10"
@@ -55,7 +59,7 @@ export function ResultPreview({
             // The second copy on a print sheet is a duplicate: reachable by pointer, not by Tab.
             tabIndex={copyIndex === 0 ? undefined : -1}
             aria-hidden={copyIndex === 0 ? undefined : true}
-            aria-label={`Retake photo ${index + 1}`}
+            aria-label={`${verb} photo ${index + 1}`}
             onClick={() => onRetake(index)}
             className={cn(
               "group/slot absolute rounded-xs outline-none",
@@ -71,8 +75,8 @@ export function ResultPreview({
           >
             <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity group-hover/slot:opacity-100 group-focus-visible/slot:opacity-100">
               <span className="flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white">
-                <RotateCcwIcon className="size-3" />
-                Retake
+                {action === "replace" ? <ImageUpIcon className="size-3" /> : <RotateCcwIcon className="size-3" />}
+                {verb}
               </span>
             </span>
           </button>

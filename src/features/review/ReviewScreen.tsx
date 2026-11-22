@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react"
 import {
   DownloadIcon,
+  ImagesIcon,
   PrinterIcon,
   RotateCcwIcon,
   ShareIcon,
@@ -18,6 +19,7 @@ import { useSession } from "@/features/booth/session"
 import { useLogo } from "@/features/compose/logoStore"
 import { downloadFile } from "@/features/export/export"
 import { PrintImage, printNow } from "@/features/export/print"
+import { useLibraryPhotos } from "@/features/library/useLibraryPhotos"
 import { shareFile } from "@/features/export/share"
 import { compositeGeometry, computePrintSheet } from "@/features/layouts/computeLayout"
 import {
@@ -37,6 +39,7 @@ import { useWakeLock } from "@/lib/useWakeLock"
 import { useSettings } from "@/store/settings"
 
 import { Customizer } from "./Customizer"
+import { suggestNextStep } from "./nextStep"
 import { ResultPreview } from "./ResultPreview"
 import { useComposite } from "./useComposite"
 import { useGalleryAutosave } from "./useGalleryAutosave"
@@ -63,8 +66,23 @@ export function ReviewScreen() {
   const connected = pair.status === "connected"
   const joint = session.pair !== null && session.id === pair.jointId
   const partnerName = session.pair?.partnerName || partnerLabel(pair)
-  const retakeOne = !linked ? session.retake : connected && joint ? (i: number) => usePair.getState().retake(i) : null
-  const retakeAll = !linked ? () => session.retakeAll() : connected ? () => usePair.getState().retake(null) : null
+  // Library photos are replaced from the library rather than retaken with the camera.
+  const library = useLibraryPhotos()
+  const fromLibrary = session.source === "library" && !linked
+  const retakeOne = fromLibrary
+    ? library.replacePhoto
+    : !linked
+      ? session.retake
+      : connected && joint
+        ? (i: number) => usePair.getState().retake(i)
+        : null
+  const retakeAll = fromLibrary
+    ? library.startFromLibrary
+    : !linked
+      ? () => session.retakeAll()
+      : connected
+        ? () => usePair.getState().retake(null)
+        : null
   const partnerReceived = session.pair?.shots.filter(Boolean).length ?? 0
   const partnerMissing = session.pair ? session.pair.shots.length - partnerReceived : 0
   const receiving = partnerMissing > 0 && joint && linked
@@ -116,8 +134,13 @@ export function ReviewScreen() {
     if (error) toast.error("Couldn't render the image", { id: "render-error", description: error.message })
   }, [error])
 
-  const saved = (method: SaveMethod) =>
-    trackEvent("strip_saved", { method, source: session.pair ? "shared" : "camera" })
+  const saved = (method: SaveMethod) => {
+    trackEvent("strip_saved", {
+      method,
+      source: session.source === "library" ? "library" : session.pair ? "shared" : "camera",
+    })
+    suggestNextStep({ linked })
+  }
 
   const download = () => {
     if (!result || stale) return
@@ -218,6 +241,8 @@ export function ReviewScreen() {
                 `Reconnecting to ${partnerName}…`
               ) : !retakeOne ? (
                 `Retake all to shoot a new round with ${partnerLabel(pair)}`
+              ) : fromLibrary ? (
+                `${touch ? "Tap" : "Click"} a photo to replace it`
               ) : (
                 `${touch ? "Tap" : "Click"} a photo to retake it${linked ? ` with ${partnerName}` : ""}`
               )}
@@ -225,8 +250,8 @@ export function ReviewScreen() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" onClick={() => retakeAll?.()} disabled={!retakeAll}>
-                  <RotateCcwIcon />
-                  Retake all
+                  {fromLibrary ? <ImagesIcon /> : <RotateCcwIcon />}
+                  {fromLibrary ? "Choose photos" : "Retake all"}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -243,6 +268,7 @@ export function ReviewScreen() {
               geometry={geometry}
               rendering={stale}
               onRetake={(index) => retakeOne?.(index)}
+              action={fromLibrary ? "replace" : "retake"}
               disabled={!retakeOne}
               alt={`${layout.name} with ${session.shots.length} ${session.shots.length === 1 ? "photo" : "photos"}`}
             />
@@ -294,6 +320,7 @@ export function ReviewScreen() {
         </aside>
       </main>
       <PrintImage url={ready && result ? result.url : null} size={printSize} />
+      {library.input}
     </>
   )
 }

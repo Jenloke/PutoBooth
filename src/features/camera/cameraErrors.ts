@@ -1,4 +1,4 @@
-import { isIOS, isStandalone } from "@/lib/platform"
+import { inAppBrowser, isIOS, isStandalone, type InAppBrowser } from "@/lib/platform"
 
 export type CameraErrorKind = "insecure" | "unsupported" | "denied" | "notfound" | "busy" | "unknown"
 
@@ -50,8 +50,23 @@ function deniedSteps(browser: Browser): string[] {
   }
 }
 
+/** The camera inside a chat or social app's browser: the fix is leaving it. */
+export function inAppError(kind: CameraErrorKind, app: InAppBrowser): CameraError {
+  return {
+    kind,
+    title: "Open this page in your browser",
+    message: `${app}'s built-in browser doesn't let websites use the camera. Your browser does.`,
+    steps: isIOS()
+      ? [`Tap ··· in ${app}, then Open in browser (or Open in Safari).`, "Or copy the link and paste it into Safari."]
+      : [`Tap ⋮ in ${app}, then Open in Chrome (or Open in browser).`, "Or copy the link and paste it into Chrome."],
+  }
+}
+
 export function cameraError(kind: CameraErrorKind, detail?: string): CameraError {
   const browser = detectBrowser()
+  // Chat and social apps open links in their own browser, which often blocks the camera.
+  const app = inAppBrowser()
+  if (app && (kind === "unsupported" || kind === "denied")) return inAppError(kind, app)
   switch (kind) {
     case "insecure":
       return {

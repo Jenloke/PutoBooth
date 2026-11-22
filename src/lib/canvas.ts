@@ -47,10 +47,11 @@ export function canvasToBlob(
   })
 }
 
+/** Decodes an image upright: EXIF orientation (photos from a phone's library) is applied. */
 export async function decodeImage(blob: Blob): Promise<DecodedImage> {
   if (typeof createImageBitmap === "function") {
     try {
-      const bitmap = await createImageBitmap(blob)
+      const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" })
       return {
         source: bitmap,
         width: bitmap.width,

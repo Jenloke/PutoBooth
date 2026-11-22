@@ -80,6 +80,8 @@ export default defineConfig(({ mode }) => {
                 name: "pair",
                 test: /node_modules[\\/](peerjs|peerjs-js-binarypack|webrtc-adapter|sdp|eventemitter3|@msgpack|uqr)[\\/]/,
               },
+              // The booth screen itself uses nearly all of this (Radix, the drawer, toasts, icons):
+              // splitting it by importer saves ~3 KB of the first load and costs the cache.
               { name: "ui", test: /node_modules[\\/]/ },
             ],
           },

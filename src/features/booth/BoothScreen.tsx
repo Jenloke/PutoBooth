@@ -23,6 +23,7 @@ import { getFilter, toCssFilter } from "@/features/compose/filters"
 import { GalleryButton } from "@/features/gallery/GalleryButton"
 import { compositeGeometry, slotParts, type Rect } from "@/features/layouts/computeLayout"
 import { LayoutPicker } from "@/features/layouts/LayoutPicker"
+import { useLibraryPhotos } from "@/features/library/useLibraryPhotos"
 import { LAYOUTS, aspectRatio, getLayout, shotCount } from "@/features/layouts/layouts"
 import { boothHint, partnerOverlayText } from "@/features/pair/copy"
 import { PairPreview, PartnerWaiting } from "@/features/pair/PairPreview"
@@ -91,6 +92,7 @@ export function BoothScreen() {
     },
   })
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const library = useLibraryPhotos()
   const touch = useMediaQuery("(pointer: coarse)")
   const mirrorShots = settings.mirror && camera.isFrontFacing
 
@@ -189,12 +191,16 @@ export function BoothScreen() {
     />
   )
 
+  // A solo booth can also make the strip from library photos (no camera, or a blocked one).
+  const pickPhotos = split ? undefined : library.startFromLibrary
   const gate = (
     <CameraGate
       status={camera.status}
       muted={camera.muted}
       onStart={camera.start}
       note={split ? `Your photos go straight to ${partnerName}'s device, encrypted. Nothing is uploaded.` : undefined}
+      intro={split || retaking ? undefined : { layout, countdown: settings.countdown }}
+      onPickPhotos={retaking ? undefined : pickPhotos}
     />
   )
   const overlays = (
@@ -285,8 +291,13 @@ export function BoothScreen() {
               </CameraPreview>
             )}
             {camera.status === "error" && camera.error && (
-              <CameraErrorPanel error={camera.error} onRetry={camera.start} />
+              <CameraErrorPanel
+                error={camera.error}
+                onRetry={camera.start}
+                onPickPhotos={retaking ? undefined : pickPhotos}
+              />
             )}
+            {library.input}
           </div>
 
           <div className="pb-safe flex shrink-0 flex-col gap-3 phone-landscape:w-36 phone-landscape:justify-center phone-landscape:pb-0">

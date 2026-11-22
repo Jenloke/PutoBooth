@@ -7,6 +7,9 @@
 
 /* Phones held sideways: very little height, so the booth switches to a side-by-side layout. */
 @custom-variant phone-landscape (@media (orientation: landscape) and (max-height: 560px));
+/* The camera gate by the height of its preview box (a size container): short on phones. */
+@custom-variant gate-short (@container (max-height: 300px));
+@custom-variant gate-tall (@container (min-height: 420px));
 
 /* Safe areas (Dynamic Island, home indicator, landscape notch). */
 @utility pt-safe {
