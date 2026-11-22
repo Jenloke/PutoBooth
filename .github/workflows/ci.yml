@@ -1,0 +1,90 @@
+# Checks every pull request and every push to main. Deploys are not done here: Vercel's Git
+# integration builds and deploys on its own. See docs/ci.md.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One run per pull request or branch: a new push cancels the run it replaces. Runs on main
+# are never cancelled, so every commit there gets a result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, unit tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # engines.node in package.json ("22.x"), the version Vercel builds with.
+          node-version-file: package.json
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      # Every check below runs even when an earlier one failed, so one run reports every problem.
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+
+      - name: Type check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
+
+      # The same command Vercel runs for every deploy.
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+
+      # After the build on purpose: tests/csp.test.ts also checks the inline scripts of every
+      # page in dist/ against the CSP in vercel.json, and skips that test when dist/ is missing.
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Chromium only: the tests use its fake camera. --with-deps adds the system libraries
+      # it needs on Ubuntu.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts starts a local PeerServer, builds the app pointed at it, and
+      # serves dist/ with vite preview. That build differs from the one in the checks job, so
+      # it isn't shared between the jobs.
+      - name: Run Playwright
+        run: npm run test:e2e
+
+      - name: Upload the Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-attempt-${{ github.run_attempt }}
+          path: playwright-report/
+          retention-days: 14
