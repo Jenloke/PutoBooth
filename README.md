@@ -40,6 +40,14 @@ npm run dev          # http://localhost:5173 (localhost may use the camera witho
 
 Node 22 is required (`engines.node` is `22.x`, which Vercel also uses).
 
+## Continuous integration
+
+GitHub Actions runs `.github/workflows/ci.yml` on every pull request and every push to `main`:
+lint, type check, build and unit tests in one job, and the Playwright suite in another. It doesn't
+deploy; Vercel still does that on its own. Require both checks on `main` so only passing changes
+reach production. [docs/ci.md](docs/ci.md) covers what each step catches, that one-time GitHub
+setting, and what to do when a check fails.
+
 ## Deploying to Vercel
 
 The repo is a plain static Vite site: no server functions, and no environment variables are
