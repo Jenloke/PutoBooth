@@ -6,16 +6,23 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 
+import { resolveSiteUrl, sitePlugin } from "./site/plugin.ts"
+import { SITE_PAGES } from "./src/lib/site.ts"
+
+const root = import.meta.dirname
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // `npm run dev:https`: self-signed HTTPS on the LAN so an iPhone can use the camera.
   const lanHttps = mode === "https"
+  const siteUrl = resolveSiteUrl(process.env)
 
   return {
     plugins: [
       react(),
       tailwindcss(),
       lanHttps && basicSsl(),
+      sitePlugin({ root, siteUrl }),
       VitePWA({
         // Never reload on our own: the app shows a "Reload" toast, and never mid-session.
         registerType: "prompt",
@@ -46,17 +53,22 @@ export default defineConfig(({ mode }) => {
           // Precache the whole app (fonts included) so it works offline after the first visit.
           globPatterns: ["**/*.{js,css,html,woff2,png,svg,webmanifest}"],
           navigateFallback: "/index.html",
+          // Only the app's own routes. The static pages are precached under their clean URLs,
+          // and an unknown path goes to the network for the real 404.
+          navigateFallbackAllowlist: [/^\/(?:\?.*)?$/, /^\/gallery(?:\?.*)?$/],
           cleanupOutdatedCaches: true,
         },
       }),
     ],
     resolve: {
       alias: {
-        "@": resolve(import.meta.dirname, "./src"),
+        "@": resolve(root, "./src"),
       },
     },
     build: {
       rolldownOptions: {
+        // The app plus the static pages; each becomes its own HTML file in dist/.
+        input: Object.fromEntries(SITE_PAGES.map((page) => [page.file.replace(/\.html$/, ""), resolve(root, page.file)])),
         output: {
           // Libraries change rarely: separate chunks stay cached across deploys, so an
           // update only downloads the app code.

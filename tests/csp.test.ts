@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
@@ -43,10 +43,14 @@ describe("Content-Security-Policy", () => {
   })
 
   it.runIf(existsSync(resolve(root, "dist/index.html")))(
-    "allows every inline script in the built index.html",
+    "allows every inline script in every built page",
     () => {
-      const hashes = inlineScriptHashes(readFileSync(resolve(root, "dist/index.html"), "utf8"))
-      for (const hash of hashes) expect(scriptSrc).toContain(hash)
+      const pages = readdirSync(resolve(root, "dist")).filter((file) => file.endsWith(".html"))
+      expect(pages).toContain("404.html")
+      for (const page of pages) {
+        const hashes = inlineScriptHashes(readFileSync(resolve(root, "dist", page), "utf8"))
+        for (const hash of hashes) expect(scriptSrc, page).toContain(hash)
+      }
     }
   )
 

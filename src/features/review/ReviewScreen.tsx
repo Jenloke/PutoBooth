@@ -203,6 +203,7 @@ export function ReviewScreen() {
     <>
       <AppHeader />
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row phone-landscape:flex-row">
+        <h1 className="sr-only">Review and save</h1>
         <section aria-label="Result" className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-2 px-4 pt-3">
             <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">

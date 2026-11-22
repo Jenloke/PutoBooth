@@ -238,6 +238,7 @@ export function BoothScreen() {
         }
       />
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <h1 className="sr-only">Photo booth</h1>
         <section aria-label="Booth" className="flex min-h-0 flex-1 flex-col phone-landscape:flex-row">
           {retaking && !shooting && (
             <div className="flex items-center justify-center gap-3 px-3 pt-3 text-sm phone-landscape:hidden">
