@@ -4,7 +4,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "trailingSlash": false,
-  "rewrites": [{ "source": "/gallery", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/gallery", "destination": "/index.html" },
+    { "source": "/how-it-works", "destination": "/how-it-works.html" },
+    { "source": "/shoot-together", "destination": "/shoot-together.html" },
+    { "source": "/photo-strip-maker", "destination": "/photo-strip-maker.html" },
+    { "source": "/privacy", "destination": "/privacy.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

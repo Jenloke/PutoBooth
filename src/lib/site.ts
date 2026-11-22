@@ -13,6 +13,10 @@ export interface SitePage {
 
 export const SITE_PAGES = [
   { file: "index.html", path: "/" },
+  { file: "how-it-works.html", path: "/how-it-works", nav: "How it works" },
+  { file: "shoot-together.html", path: "/shoot-together", nav: "Shoot together" },
+  { file: "photo-strip-maker.html", path: "/photo-strip-maker", nav: "Photo strips" },
+  { file: "privacy.html", path: "/privacy", nav: "Privacy" },
   { file: "404.html", path: null },
 ] as const satisfies readonly SitePage[]
 

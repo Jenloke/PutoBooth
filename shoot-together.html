@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shoot Together: A Photo Booth for Two Devices | Photobooth</title>
+    <meta
+      name="description"
+      content="Take a photo strip with someone on another phone or computer, anywhere. A countdown on both screens, both of you in every photo, sent device to device."
+    />
+    <!-- site:head -->
+    <link rel="stylesheet" href="/site/site.css" />
+  </head>
+  <body>
+    <!-- site:header -->
+    <main class="site-container content py-12 sm:py-16">
+      <h1>Shoot a photo strip together, from two devices</h1>
+      <p class="lead">
+        Each of you fills one half of every photo. The countdown runs on both screens at once, and you both get the
+        finished strip. Be in the same room, or on opposite sides of the world.
+      </p>
+      <p class="mt-8"><a href="/?together" class="site-button site-button-lg">Start a shared booth</a></p>
+
+      <h2 id="how">How to start</h2>
+      <ol>
+        <li>
+          One of you opens the booth, taps the people icon at the top, then <strong>Start a shared booth</strong>. You
+          get a code like <strong>K7M-4QD</strong>, a QR code and an invite link.
+        </li>
+        <li>
+          The other person scans the QR code, opens the link, or taps <strong>Shoot together</strong> and types the
+          code.
+        </li>
+        <li>The preview splits in two: your camera in your half, the other person's live video in theirs.</li>
+        <li>Either of you presses the shutter. The countdown, flash and photos happen on both devices together.</li>
+        <li>Each of you styles and saves your own copy. Tap a photo to retake it, together.</li>
+      </ol>
+
+      <h2 id="need">What you need</h2>
+      <ul>
+        <li>Two devices with a camera, in any mix: phones, tablets and computers.</li>
+        <li>
+          Safari or Chrome. If the invite opens inside Messenger, Instagram or another app, open it in your browser:
+          their built-in browsers often block the camera.
+        </li>
+        <li>Any internet connection. You don't need to be on the same Wi-Fi.</li>
+        <li>No account and no app to install.</li>
+      </ul>
+
+      <h2 id="privacy">Private by design</h2>
+      <p>
+        Photos and live video go straight from one device to the other, encrypted. A free connection service
+        (PeerJS) introduces the two devices with a few small messages and never sees your photos. When a phone
+        network blocks a direct connection, relay servers pass the still-encrypted traffic along. Nothing is stored
+        on a server. <a href="/privacy">More about privacy</a>.
+      </p>
+
+      <h2 id="questions">Questions</h2>
+      <details>
+        <summary>Do we need to be on the same Wi-Fi?</summary>
+        <p>No. Any connection works, mobile data included.</p>
+      </details>
+      <details>
+        <summary>Can one of us use a laptop?</summary>
+        <p>Yes. Any mix of phones, tablets and computers works, as long as each has a camera.</p>
+      </details>
+      <details>
+        <summary>Who gets the photos?</summary>
+        <p>
+          Both of you. Each device keeps its own photos at full resolution and receives the other person's, then saves
+          its own copy with its own style.
+        </p>
+      </details>
+      <details>
+        <summary>How in sync is it?</summary>
+        <p>
+          The devices measure the difference between their clocks and run the same timeline, so the photos usually
+          land within a few hundredths of a second of each other.
+        </p>
+      </details>
+      <details>
+        <summary>What if the connection drops?</summary>
+        <p>
+          The booth notices within about ten seconds and reconnects on its own for up to two minutes. A countdown in
+          progress is cancelled on both devices, so nobody ends up with half a strip.
+        </p>
+      </details>
+
+      <div class="cta">
+        <p class="font-medium">Send the invite, then shoot together.</p>
+        <a href="/?together" class="site-button site-button-lg">Start a shared booth</a>
+      </div>
+    </main>
+    <!-- site:footer -->
+  </body>
+</html>

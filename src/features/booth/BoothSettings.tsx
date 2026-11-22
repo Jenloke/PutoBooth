@@ -24,6 +24,7 @@ import { CameraPicker } from "@/features/camera/CameraPicker"
 import type { UseCamera } from "@/features/camera/useCamera"
 import { LayoutPicker } from "@/features/layouts/LayoutPicker"
 import { LAYOUTS, isLayoutId, type LayoutId } from "@/features/layouts/layouts"
+import { NAV_PAGES } from "@/lib/site"
 import {
   COUNTDOWN_OPTIONS,
   PAUSE_RANGE,
@@ -221,6 +222,14 @@ export function BoothSettings({
           </ToggleGroup>
         </Field>
       </FieldSet>
+
+      <nav aria-label="About" className="flex flex-wrap gap-x-4 gap-y-2 border-t pt-5 text-sm text-muted-foreground">
+        {NAV_PAGES.map((page) => (
+          <a key={page.path} href={page.path} className="underline-offset-4 hover:text-foreground hover:underline">
+            {page.nav}
+          </a>
+        ))}
+      </nav>
     </FieldGroup>
   )
 }
