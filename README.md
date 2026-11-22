@@ -10,15 +10,18 @@ the countdown runs on both screens at once, and both get the strip (see
 
 Everything happens on the device. There is no backend, no photo is ever uploaded, and the site
 deploys to Vercel as static files. In a shared booth, photos go straight to the other device.
-The deployed site counts page views with [Vercel Web Analytics](#web-analytics): no cookies, and
-no photos, names or room codes.
+The deployed site counts visits and a few funnel steps with [Vercel Web Analytics](#web-analytics),
+and page speed with Speed Insights: no cookies, and no photos, names or room codes. Next to the app
+it serves a few static pages for search (see [Search and link previews](#search-and-link-previews)).
 
 - **Stack:** Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), lucide-react,
-  zustand, idb-keyval, vite-plugin-pwa, PeerJS (WebRTC), uqr, @vercel/analytics, self-hosted fonts
-  via @fontsource.
-- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP, the SPA rewrite, analytics,
-  and the shared booth's protocol, framing, clock sync and timeline) and Playwright (full sessions
-  with Chromium's fake camera, including two browsers sharing a booth).
+  zustand, idb-keyval, vite-plugin-pwa, PeerJS (WebRTC), uqr, @vercel/analytics,
+  @vercel/speed-insights, self-hosted fonts via @fontsource.
+- **Tests:** Vitest (layout geometry, filter matrices, crop math, CSP, routes in `vercel.json`, SEO
+  tags and sitemap, analytics, in-app browser detection, library import, and the shared booth's
+  protocol, framing, clock sync and timeline) and Playwright (full sessions with Chromium's fake
+  camera, two browsers sharing a booth, a first visit without camera access, a strip from library
+  photos, and the static pages).
 
 ## Quick start
 
@@ -36,15 +39,15 @@ npm run dev          # http://localhost:5173 (localhost may use the camera witho
 | `npm run typecheck` / `npm run lint` | TypeScript project build / ESLint |
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:e2e` | End-to-end tests (Playwright; first run `npx playwright install chromium`) |
-| `npm run icons` | Regenerates the PWA icons in `public/` from the SVG in `scripts/generate-icons.mjs` |
+| `npm run icons` | Regenerates the PWA icons and the link preview image (`og-image.jpg`) in `public/` from `scripts/generate-icons.mjs` |
 
 Node 22 is required (`engines.node` is `22.x`, which Vercel also uses).
 
 ## Deploying to Vercel
 
 The repo is a plain static Vite site: no server functions, and no environment variables are
-needed (the shared booth has optional ones, see below). `vercel.json` holds the rewrite, cache
-and security headers.
+needed (optional ones: `SITE_URL`, see [Search and link previews](#search-and-link-previews), and
+the shared booth's, see below). `vercel.json` holds the routes, cache and security headers.
 
 ### One-time setup (Git integration)
 
@@ -55,8 +58,10 @@ and security headers.
 4. Deploy. From then on:
    - every push to `main` deploys to **production**;
    - every other branch and every pull request gets its own HTTPS **preview URL**.
-5. Open the project's **Analytics** tab, select **Enable**, and redeploy (see
-   [Web analytics](#web-analytics)).
+5. Open the project's **Analytics** tab and select **Enable**, do the same under **Speed
+   Insights**, and redeploy (see [Web analytics](#web-analytics)).
+6. After the first production deploy, add the site to Google Search Console and Bing Webmaster
+   Tools (see [After the first production deploy](#after-the-first-production-deploy)).
 
 The camera requires HTTPS, and every Vercel URL is HTTPS.
 
@@ -81,10 +86,14 @@ npx vercel --prod   # production deployment
 
 ### What `vercel.json` does
 
-- **SPA fallback.** Every path rewrites to `/index.html`, so reloading `/gallery` works.
-  Real files in `dist/` are served first. Vercel's own `/_vercel/*` routes (Web Analytics) are
-  left out, or the analytics script would come back as the app's HTML. `tests/vercel.test.ts`
-  checks both.
+- **Routes.** `/gallery` rewrites to `/index.html` (the app routes on the client), and each
+  static page's clean URL (`/how-it-works`) to its file. Nothing else is rewritten, so an unknown
+  path gets `404.html` with a real 404 status, not the app with a 200 (which search engines count
+  as a "soft 404"). Vercel's own `/_vercel/*` routes (analytics) are untouched.
+  `trailingSlash: false` redirects `/gallery/` to `/gallery`, so each page has one URL.
+  `tests/vercel.test.ts` checks all of this against `src/lib/site.ts`.
+- **`/gallery` is `noindex`** (an `X-Robots-Tag` header): it's different on every device and
+  empty to a crawler.
 - **Caching.**
   - `/assets/*` has hashed file names, so it's cached for a year as `immutable`.
   - `/sw.js` and `/manifest.webmanifest` are `no-cache`, so installed apps notice new deploys.
@@ -97,35 +106,123 @@ npx vercel --prod   # production deployment
     `wss://0.peerjs.com`, the shared booth's signaling server. `tests/csp.test.ts` checks it
     matches `src/features/pair/config.ts`.
   - The one inline script, the no-flash theme snippet in `index.html`, is allowed by its sha256
-    hash. If you edit that script, update the hash in `vercel.json`. `tests/csp.test.ts` fails
-    until they match, and prints the hash it expects.
+    hash. The static pages get a byte-for-byte copy, so the same hash covers them. If you edit
+    that script, update the hash in `vercel.json`. `tests/csp.test.ts` fails until they match
+    (in every built page), and prints the hash it expects. The structured data in `index.html` is
+    a JSON data block, not a script, so the CSP doesn't apply to it.
 
 ### Web analytics
 
 The deployed site uses [Vercel Web Analytics](https://vercel.com/docs/analytics) to count
-visitors and page views. It sets no cookies and reports the page (`/` or `/gallery`), referrer,
-country, browser and device type. Photos, display names, room codes and anything else in the app
-are never sent.
+visitors, page views and the steps of the [activation funnel](#the-funnel), and
+[Speed Insights](https://vercel.com/docs/speed-insights) for Core Web Vitals from real visits.
+Neither sets cookies. Photos, display names, captions, room codes and anything else in the app are
+never sent.
 
-- **Turning it on.** Enable it in the project's **Analytics** tab, then redeploy. Until then the
-  script request returns 404 and nothing is counted.
-- **Where it runs.** `src/lib/analytics.ts` loads the script only in builds Vercel makes for
+- **Turning it on.** Enable each in the project's **Analytics** and **Speed Insights** tabs, then
+  redeploy. Until then the script requests return 404 and nothing is counted.
+- **Custom events need Pro.** Vercel records custom events only on the Pro and Enterprise plans,
+  with at most two properties each on Pro (every event here has two or fewer). On Hobby the
+  events are dropped and page views still count.
+- **Where it runs.** `src/lib/analytics.ts` loads the scripts only in builds Vercel makes for
   production and preview deployments, which it recognizes by `VITE_VERCEL_ENV` (Vercel sets it
   while **Automatically expose System Environment Variables** is on, the default). The dev
-  server, `npm run preview` and the end-to-end tests never load it, and make no analytics
+  server, `npm run preview` and the end-to-end tests never load them, and make no analytics
   requests. Preview traffic is reported too; the dashboard filters by environment.
-- **Same origin.** The script and its reports use `/_vercel/insights/*` on the site's own domain,
-  so the CSP needs no extra hosts. Ad blockers may still block it, so the numbers run low.
+- **Same origin.** The scripts and their reports use `/_vercel/insights/*` and
+  `/_vercel/speed-insights/*` on the site's own domain, so the CSP needs no extra hosts. Ad
+  blockers may still block them, so the numbers run low.
 - **Invite codes.** An invite link carries its room code (`/?join=CODE`). The app removes it from
-  the address bar before analytics starts, and a `beforeSend` hook strips it from every event in
-  case that ever changes.
+  the address bar before analytics starts, and a `beforeSend` hook strips it from every event and
+  every Speed Insights report in case that ever changes.
+
+#### The funnel
+
+The app is one URL: shooting, reviewing and saving all happen on `/`, so a page-view bounce rate
+can't tell a finished strip from a visitor who left after three seconds. Bounces are counted by
+what people do instead. `trackEvent()` in `src/lib/analytics.ts` sends these:
+
+| Event | Sent when | Properties |
+| --- | --- | --- |
+| `camera_start` | Start camera is tapped, or the camera starts by itself for a returning visitor (once per page load) | `auto` |
+| `camera_error` | The camera fails (once per kind per page load) | `kind`, `app` (the in-app browser, or `none`) |
+| `photos_imported` | A strip is made from library photos | `count`, `layout` |
+| `shoot_start` | The shutter is pressed (not for a single retake) | `layout`, `shared` |
+| `strip_done` | A full sequence reaches the review | `layout`, `shared` |
+| `strip_saved` | Download, share or print | `method`, `source` (`camera`, `shared` or `library`) |
+| `pair` | A shared booth is opened | `role`, `via` (`button`, `code` or `link`) |
+| `in_app_browser` | The page opens inside Messenger, Instagram, TikTok and the like | `app` |
+| `open_in_browser` | Open in Chrome or Copy link, from the in-app browser notice | `app`, `action` |
+| `install` | The install prompt is answered, the iOS hint is shown, or the app is installed | `outcome` |
+
+- **Bounce:** a visit with neither `camera_start` nor `photos_imported`.
+- **Activation:** the share of visits with a `strip_saved`. This is the number to grow.
 
 ### Updates to the installed app
 
-The service worker precaches the whole app, so it works offline after the first visit. When
+The service worker precaches the whole app, so it works offline after the first visit. It
+answers navigations to `/` and `/gallery` with the app, and the static pages from the precache
+under their clean URLs. Other paths go to the network, which returns the 404 page. When
 a new deploy is live, the app shows a **"New version available · Reload"** toast. It checks on
 launch, hourly, and whenever the app returns to the foreground. The toast never appears while
 photos are being taken, and nothing reloads by itself.
+
+## Search and link previews
+
+Next to the app (`index.html`), the site serves static pages for people searching for a photo
+booth or a photo strip maker: `/how-it-works`, `/shoot-together`, `/photo-strip-maker` and
+`/privacy`, plus `404.html`. They are plain HTML, with no JavaScript beyond the theme snippet,
+styled by `site/site.css` with the app's design tokens (`src/styles/theme.css`).
+
+- **One list of pages.** `src/lib/site.ts` lists every HTML page. The build inputs, the SEO tags,
+  the sitemap, the page header and footer, the booth's About links and (checked by
+  `tests/vercel.test.ts`) the rewrites in `vercel.json` all follow it.
+- **Generated at build time** by `site/plugin.ts`: a canonical URL plus Open Graph and Twitter
+  tags for every page (from its `<title>` and meta description), `robots.txt` and `sitemap.xml`.
+  Static pages fill in `<!-- site:head -->`, `<!-- site:header -->` and `<!-- site:footer -->`
+  from `site/partials.ts`. The 404 page is `noindex` and has no canonical URL.
+- **The site's address.** Canonical URLs, the sitemap and link previews need an absolute URL. On
+  Vercel it's the project's production domain (`VERCEL_PROJECT_PRODUCTION_URL`: the shortest
+  custom domain, else `*.vercel.app`), on previews too, so their canonical URLs point at
+  production. Set `SITE_URL` (for example `https://booth.example.com`) in Vercel to choose another.
+  Local builds use `http://localhost:4173`.
+- **First paint.** `index.html` carries a static copy of the header and a short intro inside
+  `#root`. It shows before the JavaScript runs and gives crawlers and link previews real text;
+  React replaces it on start. `index.html` also has `WebApplication` structured data.
+- **Link previews.** `public/og-image.jpg` (1200×630) is the picture chat apps and social sites
+  show for any link to the site, invites included. `npm run icons` renders it. It isn't
+  precached, so visitors never download it.
+- **Adding a page.** Create `name.html` at the root (copy `privacy.html`: a `<title>` under 70
+  characters, a meta description of 50 to 160, and one `<h1>`). Add it to `SITE_PAGES` in
+  `src/lib/site.ts`, and add `{ "source": "/name", "destination": "/name.html" }` to the
+  rewrites in `vercel.json`. `npm test` fails until all three agree.
+
+### After the first production deploy
+
+1. Add the site to [Google Search Console](https://search.google.com/search-console) as a
+   **Domain** property (verified with a DNS TXT record, so the pages need no meta tag), and
+   submit `https://<domain>/sitemap.xml` under **Sitemaps**.
+2. Do the same in [Bing Webmaster Tools](https://www.bing.com/webmasters), which can import the
+   site from Search Console.
+3. In Search Console, run **URL Inspection → Test live URL → View tested page** on `/` and
+   `/shoot-together` to see what Google renders.
+4. Paste a link into a chat to check the preview's picture, title and description.
+
+## Measuring and improving
+
+Collect two weeks of numbers before changing anything, as a baseline. Then, once a week:
+
+- **Funnel** (Web Analytics → Events): visits → `camera_start` or `photos_imported` →
+  `shoot_start` → `strip_done` → `strip_saved`. Work on the biggest drop first. Many
+  `camera_error` events with an `app` other than `none` mean links travel through chat apps; many
+  with `denied` mean people back out at the permission prompt.
+- **Speed** (Speed Insights, mobile, 75th percentile): LCP under 2.5 s, INP under 200 ms, CLS
+  under 0.1.
+- **Search** (Search Console → Performance): impressions, clicks, click-through rate and position,
+  by query and by page. A page with many impressions and few clicks needs a title and description
+  that answer that query. Queries without a matching page are ideas for new ones.
+
+Change one thing at a time, and compare it with the weeks before.
 
 ## Shared booth
 
@@ -235,13 +332,24 @@ src/
     review/              review screen, customizer, debounced export rendering, gallery autosave
     export/              file names + download, Web Share, print
     gallery/             IndexedDB store, gallery screen and viewer
+    library/             strips from library photos: decode upright, fill the layout, replace one
     pair/                shared booth: room codes, message protocol + validation, photo framing,
                          clock sync, PeerJS link, store (host decisions, photo exchange), dialog,
                          split preview
   store/settings.ts      persisted settings (zustand + localStorage)
-  lib/                   platform detection, canvas helpers, router, hooks
+  styles/theme.css       design tokens (light and dark), shared with the static pages
+  lib/                   platform detection (in-app browsers too), canvas helpers, router, hooks,
+                         analytics + funnel events, install prompt, the site's page list (site.ts)
+site/                    build-time SEO plugin, the static pages' header, footer and stylesheet
+*.html                   the app (index.html), the static pages, and 404.html
 ```
 
+- **Camera screen.** Before the camera starts, a solo booth shows a miniature of the selected
+  layout filling in photo by photo (`LayoutDemo`), the photo count and countdown, and **Use photos
+  instead**. In an in-app browser it adds a notice with **Open in Chrome** (Android) and **Copy
+  link**, keeping a guest's invite code.
+- **After saving.** The first saved strip brings one suggestion, once per device: install the app
+  where the browser can, otherwise the shared booth (`review/nextStep.ts`).
 - **WYSIWYG.** The review screen shows the actual export: the same canvas, encoded to the
   same PNG or JPEG you download or share. It re-renders on every change, debounced, and keeps
   a ready-made `File`, so Share can call `navigator.share()` directly inside the tap.
