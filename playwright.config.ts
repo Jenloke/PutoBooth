@@ -12,7 +12,12 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"]],
+  // On CI (see .github/workflows/ci.yml): a stray test.only fails the run instead of skipping
+  // every other test, a failed test gets one retry (a pass on retry is reported as flaky), and
+  // an HTML report with the traces of failed tests is written for the workflow to upload.
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
