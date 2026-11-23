@@ -1,0 +1,106 @@
+/* The static pages (everything but the app). Only their own markup is scanned for classes. */
+@import "tailwindcss" source(none);
+@import "@fontsource-variable/geist";
+@import "../src/styles/theme.css";
+
+@source "../*.html";
+@source "./partials.ts";
+
+@layer components {
+  .site-container {
+    @apply mx-auto w-full max-w-3xl px-4 sm:px-6;
+  }
+
+  .site-header {
+    @apply sticky top-0 z-10 border-b bg-background/90 backdrop-blur;
+  }
+
+  .site-nav-link {
+    @apply rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground;
+  }
+  .site-nav-link[aria-current="page"] {
+    @apply font-medium text-foreground;
+  }
+
+  .site-button {
+    @apply inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85;
+  }
+  .site-button-lg {
+    @apply h-11 px-5 text-base;
+  }
+
+  .site-footer {
+    @apply mt-20 border-t;
+  }
+  .site-footer-link {
+    @apply text-sm text-muted-foreground transition-colors hover:text-foreground;
+  }
+  .site-footer-link[aria-current="page"] {
+    @apply text-foreground;
+  }
+
+  /* Long-form text. */
+  .content {
+    @apply text-base leading-7;
+  }
+  .content h1 {
+    @apply font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl;
+  }
+  .content h2 {
+    @apply mt-14 scroll-mt-20 font-heading text-xl font-semibold tracking-tight text-balance sm:text-2xl;
+  }
+  .content h3 {
+    @apply mt-8 font-semibold;
+  }
+  .content p {
+    @apply mt-4 text-pretty;
+  }
+  .content .lead {
+    @apply mt-4 text-lg text-pretty text-muted-foreground;
+  }
+  .content ul,
+  .content ol {
+    @apply mt-4 flex flex-col gap-2 pl-6;
+  }
+  .content ul {
+    @apply list-disc;
+  }
+  .content ol {
+    @apply list-decimal;
+  }
+  .content li::marker {
+    @apply text-muted-foreground;
+  }
+  .content a:not(.site-button) {
+    @apply font-medium underline underline-offset-4;
+  }
+  .content strong {
+    @apply font-semibold;
+  }
+  .content table {
+    @apply mt-4 w-full border-collapse text-sm;
+  }
+  .content th,
+  .content td {
+    @apply border-b py-2 pr-4 text-left align-top;
+  }
+  .content th {
+    @apply font-medium;
+  }
+  .content details {
+    @apply border-b py-4;
+  }
+  .content summary {
+    @apply cursor-pointer font-medium;
+  }
+  .content details p {
+    @apply mt-2 text-muted-foreground;
+  }
+
+  .cta {
+    @apply mt-14 flex flex-col items-start gap-4 rounded-xl border bg-muted/40 p-6 sm:flex-row sm:items-center sm:justify-between;
+  }
+  .cta p {
+    @apply mt-0;
+  }
+}

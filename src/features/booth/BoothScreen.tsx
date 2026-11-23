@@ -23,12 +23,14 @@ import { getFilter, toCssFilter } from "@/features/compose/filters"
 import { GalleryButton } from "@/features/gallery/GalleryButton"
 import { compositeGeometry, slotParts, type Rect } from "@/features/layouts/computeLayout"
 import { LayoutPicker } from "@/features/layouts/LayoutPicker"
+import { useLibraryPhotos } from "@/features/library/useLibraryPhotos"
 import { LAYOUTS, aspectRatio, getLayout, shotCount } from "@/features/layouts/layouts"
 import { boothHint, partnerOverlayText } from "@/features/pair/copy"
 import { PairPreview, PartnerWaiting } from "@/features/pair/PairPreview"
 import { isLinked, partnerLabel, usePair } from "@/features/pair/pairStore"
 import { startBlocker } from "@/features/pair/presence"
 import { sideOf, type Side } from "@/features/pair/protocol"
+import { trackEvent } from "@/lib/analytics"
 import { useHotkeys } from "@/lib/useHotkeys"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { useWakeLock } from "@/lib/useWakeLock"
@@ -90,6 +92,7 @@ export function BoothScreen() {
     },
   })
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const library = useLibraryPhotos()
   const touch = useMediaQuery("(pointer: coarse)")
   const mirrorShots = settings.mirror && camera.isFrontFacing
 
@@ -121,6 +124,7 @@ export function BoothScreen() {
     if (!canShoot || shooting) return
     if (settings.sound) unlockAudio()
     setSettingsOpen(false)
+    if (!retaking) trackEvent("shoot_start", { layout: session.layoutId, shared: linked })
     if (linked) usePair.getState().shoot()
     else runner.start({ mirror: mirrorShots })
   }
@@ -187,12 +191,16 @@ export function BoothScreen() {
     />
   )
 
+  // A solo booth can also make the strip from library photos (no camera, or a blocked one).
+  const pickPhotos = split ? undefined : library.startFromLibrary
   const gate = (
     <CameraGate
       status={camera.status}
       muted={camera.muted}
       onStart={camera.start}
       note={split ? `Your photos go straight to ${partnerName}'s device, encrypted. Nothing is uploaded.` : undefined}
+      intro={split || retaking ? undefined : { layout, countdown: settings.countdown }}
+      onPickPhotos={retaking ? undefined : pickPhotos}
     />
   )
   const overlays = (
@@ -236,6 +244,7 @@ export function BoothScreen() {
         }
       />
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <h1 className="sr-only">Photo booth</h1>
         <section aria-label="Booth" className="flex min-h-0 flex-1 flex-col phone-landscape:flex-row">
           {retaking && !shooting && (
             <div className="flex items-center justify-center gap-3 px-3 pt-3 text-sm phone-landscape:hidden">
@@ -282,8 +291,13 @@ export function BoothScreen() {
               </CameraPreview>
             )}
             {camera.status === "error" && camera.error && (
-              <CameraErrorPanel error={camera.error} onRetry={camera.start} />
+              <CameraErrorPanel
+                error={camera.error}
+                onRetry={camera.start}
+                onPickPhotos={retaking ? undefined : pickPhotos}
+              />
             )}
+            {library.input}
           </div>
 
           <div className="pb-safe flex shrink-0 flex-col gap-3 phone-landscape:w-36 phone-landscape:justify-center phone-landscape:pb-0">

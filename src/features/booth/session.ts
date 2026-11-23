@@ -19,7 +19,7 @@ export type Phase = "idle" | "starting" | "countdown" | "capturing" | "pause" | 
 
 export interface Shot {
   id: string
-  /** Full camera frame (JPEG at camera resolution), already mirrored if requested. */
+  /** Full camera frame (JPEG at camera resolution), already mirrored if requested, or a library photo. */
   blob: Blob
   /** Object URL for thumbnails; revoked when the shot is replaced or the session resets. */
   url: string
@@ -36,10 +36,14 @@ export interface PairShots {
   shots: (Shot | null)[]
 }
 
+/** Where a session's photos came from. Library photos are replaced from the library, not retaken. */
+export type ShotSource = "camera" | "library"
+
 export interface SessionState {
   /** Also the gallery entry id, so edits update the same entry. In a shared booth, the host's id. */
   id: string
   phase: Phase
+  source: ShotSource
   layoutId: LayoutId
   /** This device's photos, one per slot. */
   shots: (Shot | null)[]
@@ -85,6 +89,8 @@ interface SessionActions {
   startOver: () => void
   clearAutoStart: () => void
   load: (entry: { id: string; layoutId: LayoutId; shots: Shot[]; takenAt: number; pair?: PairShots | null }) => void
+  /** A new session from library photos (one per slot of the current layout), straight to review. */
+  loadPhotos: (shots: Shot[]) => void
 }
 
 export type SessionStore = SessionState & SessionActions
@@ -106,6 +112,7 @@ function freshSession(layoutId: LayoutId): SessionState {
   return {
     id: uid(),
     phase: "idle",
+    source: "camera",
     layoutId,
     shots: emptyShots(layoutId),
     pair: null,
@@ -248,5 +255,15 @@ export const useSession = create<SessionStore>()((set, get) => ({
       pair: entry.pair ?? null,
       takenAt: entry.takenAt,
     })
+  },
+
+  loadPhotos: (shots) => {
+    const { layoutId } = get()
+    if (shots.length !== shotCount(getLayout(layoutId))) {
+      revokeShots(shots)
+      return
+    }
+    revokeSession(get())
+    set({ ...freshSession(layoutId), phase: "review", source: "library", shots })
   },
 }))

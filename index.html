@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Photobooth</title>
+    <title>Free Online Photo Booth &amp; Photo Strip Maker | Photobooth</title>
     <meta
       name="description"
-      content="A photobooth in your browser. Shoot a timed photo strip and save it. Photos never leave your device."
+      content="A free photo booth in your browser: countdown, 4 photos, print-ready 2×6 strip. Filters, captions and a shared booth for two devices. Nothing is uploaded."
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
@@ -38,9 +38,71 @@
         } catch (e) {}
       })()
     </script>
+    <!-- Structured data for search engines. A data block, not a script: the CSP doesn't apply. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Photobooth",
+        "url": "__SITE_URL__/",
+        "image": "__SITE_URL__/og-image.jpg",
+        "description": "A free photo booth that runs in your browser. Tap the shutter for a countdown and a timed series of photos, then save a print-ready photo strip. Two people can shoot together on two devices. Photos never leave your device.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and a camera. Works in Safari, Chrome, Edge and Firefox.",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Countdown with 3, 5 or 10 seconds and a timed series of photos",
+          "Classic 2×6 inch photo strips and six more layouts",
+          "Filters, frame colors, captions, date stamp and your own logo",
+          "Download, share or print at actual size",
+          "Shared booth: two devices shoot one strip together",
+          "Works offline once installed; nothing is uploaded"
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- First paint before the app's JavaScript runs, and real text for crawlers and link previews that don't run it. React replaces all of it on start. -->
+      <div class="pl-safe pr-safe flex h-dvh flex-col overflow-hidden bg-background">
+        <header class="pt-safe shrink-0 border-b bg-background">
+          <div class="flex h-14 items-center gap-1 px-3 sm:px-4">
+            <a href="/" class="mr-auto flex items-center gap-2 rounded-md px-1 py-1 font-heading text-base font-semibold tracking-tight">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6">
+                <rect x="6" y="1.5" width="12" height="21" rx="2.5" class="fill-foreground" />
+                <rect x="8" y="3.5" width="8" height="5" rx="1" class="fill-background" />
+                <rect x="8" y="9.5" width="8" height="5" rx="1" class="fill-background" />
+                <rect x="8" y="15.5" width="8" height="2.5" rx="1" class="fill-background" />
+              </svg>
+              <span>Photobooth</span>
+            </a>
+          </div>
+        </header>
+        <main class="grid flex-1 place-items-center overflow-auto p-6 text-center">
+          <div class="flex max-w-md flex-col items-center gap-4">
+            <h1 class="font-heading text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+              A free photo booth in your browser
+            </h1>
+            <p class="text-pretty text-muted-foreground">
+              Tap the shutter for a countdown and four photos, then save a print-ready 2×6 strip.
+              Shoot together on two devices. Your photos never leave your device.
+            </p>
+            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="size-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Opening the booth…
+            </p>
+            <noscript>
+              <p class="text-sm">Photobooth needs JavaScript to use your camera. Turn it on, or open this page in Safari or Chrome.</p>
+            </noscript>
+            <!-- site:links -->
+          </div>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

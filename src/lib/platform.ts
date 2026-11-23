@@ -21,6 +21,48 @@ export function deviceName(): string {
   return "Guest"
 }
 
+export function isAndroid(ua = navigator.userAgent): boolean {
+  return /Android/.test(ua)
+}
+
+export type InAppBrowser =
+  | "Messenger"
+  | "Instagram"
+  | "Facebook"
+  | "TikTok"
+  | "LINE"
+  | "Snapchat"
+  | "LinkedIn"
+  | "WeChat"
+
+/** Order matters: Messenger's user agent also carries Facebook's tokens. */
+const IN_APP_BROWSERS: readonly [InAppBrowser, RegExp][] = [
+  ["Messenger", /FBAN\/Messenger|FB_IAB\/(?:MESSENGER|Orca-Android)/i],
+  ["Instagram", /\bInstagram\b/],
+  ["Facebook", /FBAN\/|FBAV\/|FB_IAB\//],
+  ["TikTok", /musical_ly|BytedanceWebview|\bTikTok\b/i],
+  ["LINE", /\bLine\/\d/],
+  ["Snapchat", /\bSnapchat\b/],
+  ["LinkedIn", /LinkedInApp/],
+  ["WeChat", /MicroMessenger/],
+]
+
+/**
+ * The social or chat app whose built-in browser this page is open in, if any. These browsers
+ * often block the camera, and links shared in chats (invites included) open in them first.
+ */
+export function inAppBrowser(ua = navigator.userAgent): InAppBrowser | null {
+  for (const [app, pattern] of IN_APP_BROWSERS) if (pattern.test(ua)) return app
+  return null
+}
+
+/** An Android intent link that opens `href` in Chrome, out of an in-app browser. */
+export function chromeIntentUrl(href: string): string {
+  const url = new URL(href)
+  const scheme = url.protocol.replace(/:$/, "")
+  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=${scheme};package=com.android.chrome;end`
+}
+
 export function isStandalone(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||

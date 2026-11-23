@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy: Your Photos Never Leave Your Device | Photobooth</title>
+    <meta
+      name="description"
+      content="Photobooth takes and processes photos on your device and never uploads them. What stays on your device, what a shared booth sends, and what we count."
+    />
+    <!-- site:head -->
+    <link rel="stylesheet" href="/site/site.css" />
+  </head>
+  <body>
+    <!-- site:header -->
+    <main class="site-container content py-12 sm:py-16">
+      <h1>Privacy</h1>
+      <p class="lead">
+        In short: your photos never leave your device, except to go straight to the other person's device in a shared
+        booth. There are no accounts, no ads and no cookies.
+      </p>
+
+      <h2 id="photos">Photos</h2>
+      <p>
+        The camera, the countdown, the filters and the finished image all run in your browser. Photos are never
+        uploaded to a server, and that includes photos you pick from your library.
+      </p>
+
+      <h2 id="device">What stays on your device</h2>
+      <ul>
+        <li>
+          <strong>Gallery:</strong> your recent results and their photos, in your browser's storage (IndexedDB), so you
+          can reopen them. Delete them in the Gallery, or by clearing this site's data.
+        </li>
+        <li><strong>Settings:</strong> layout, countdown, style, caption and display name, in your browser's local storage.</li>
+        <li><strong>Logo:</strong> if you add one, it's kept in your browser's storage (IndexedDB) too.</li>
+      </ul>
+      <p>
+        Browsers can clear website storage, Safari especially for sites you haven't used in a while, so save the strips
+        you want to keep.
+      </p>
+
+      <h2 id="shared">Shared booth</h2>
+      <p>
+        In a shared booth, photos and live video go directly between the two devices, encrypted by WebRTC. Your display
+        name goes only to the other device.
+      </p>
+      <ul>
+        <li>
+          To find each other, the devices exchange a few small messages through the PeerJS cloud server
+          (0.peerjs.com). It sees the room code and the devices' network addresses, never photos or video.
+        </li>
+        <li>Google's STUN server tells each device its public network address.</li>
+        <li>
+          When a network blocks a direct connection, PeerJS's relay (TURN) servers forward the traffic, which stays
+          encrypted and unreadable to them.
+        </li>
+      </ul>
+
+      <h2 id="analytics">What we count</h2>
+      <p>
+        The site uses Vercel Web Analytics and Speed Insights to see how many people visit and how fast pages load.
+        Neither uses cookies. They record the page, the site you came from, your country, browser and device type,
+        page-load timings, and a few anonymous steps, such as "camera started" or "strip saved". They never receive
+        photos, names, captions or room codes. Vercel tells visits apart with a hash of the request that it discards
+        after 24 hours.
+      </p>
+
+      <h2 id="hosting">Hosting</h2>
+      <p>
+        The site is hosted on Vercel, which, like any web host, handles your requests (including your IP address) to
+        deliver the pages. Fonts are served from this site, not from a font service.
+      </p>
+
+      <p class="mt-10 text-sm text-muted-foreground">Last updated November 22, 2026.</p>
+
+      <div class="cta">
+        <p class="font-medium">Nothing to sign up for. Just open the booth.</p>
+        <a href="/" class="site-button site-button-lg">Open the booth</a>
+      </div>
+    </main>
+    <!-- site:footer -->
+  </body>
+</html>

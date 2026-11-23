@@ -15,6 +15,7 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { trackEvent } from "@/lib/analytics"
 import { deviceName } from "@/lib/platform"
 import { useSettings } from "@/store/settings"
 
@@ -64,7 +65,18 @@ export function PairDialog() {
   let body: ReactNode
   switch (state.status) {
     case "off":
-      body = <Start onHost={() => void host()} onJoin={(code) => void join(code)} />
+      body = (
+        <Start
+          onHost={() => {
+            trackEvent("pair", { role: "host", via: "button" })
+            void host()
+          }}
+          onJoin={(code) => {
+            trackEvent("pair", { role: "guest", via: "code" })
+            void join(code)
+          }}
+        />
+      )
       break
     case "connecting":
       body = (

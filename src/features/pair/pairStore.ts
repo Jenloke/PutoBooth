@@ -586,13 +586,30 @@ useSettings.subscribe((state, previous) => {
   if (state.displayName !== previous.displayName) publishPresence()
 })
 
-/** Opens the join flow for an invite link (`/?join=CODE`) and removes the code from the URL. */
-export function consumeJoinLink(): void {
+/**
+ * Opens the join flow for an invite link (`/?join=CODE`) and removes the code from the URL.
+ * Returns whether there was one.
+ */
+export function consumeJoinLink(): boolean {
   const url = new URL(window.location.href)
   const raw = url.searchParams.get(JOIN_PARAM)
-  if (raw === null) return
+  if (raw === null) return false
   url.searchParams.delete(JOIN_PARAM)
   history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`)
   usePair.getState().setDialogOpen(true)
   void usePair.getState().join(raw)
+  return true
+}
+
+/** `/?together` (the "Shoot together" page links here) opens the shared booth dialog. */
+export const TOGETHER_PARAM = "together"
+
+/** Opens the shared booth dialog for a `/?together` link and removes the flag from the URL. */
+export function consumeTogetherLink(): boolean {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has(TOGETHER_PARAM)) return false
+  url.searchParams.delete(TOGETHER_PARAM)
+  history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  usePair.getState().setDialogOpen(true)
+  return true
 }
